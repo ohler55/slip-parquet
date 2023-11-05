@@ -1,0 +1,105 @@
+Entering the SLIP REPL editor. Type ctrl-h for help and key bindings.<newline> 
+<esc> [2K
+<esc> [1;94m▶ <esc> [m
+=> 2a addByte
+*
+=> 70 addByte
+p
+=> 61 addByte
+a
+=> 63 addByte
+c
+=> 09 tab
+kage
+=> 09 tab
+*package*            *package-load-path*  <newline> 
+<esc> 7<esc> [?25l
+┌────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┒
+│
+┃
+┕━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+<esc> 8<esc> [?25h
+<esc> [J
+=> 7f delBack
+<esc> [2K
+<esc> [1;94m▶ <esc> [m*packag
+<esc> [J
+=> 7f delBack
+<esc> [2K
+<esc> [1;94m▶ <esc> [m*packa
+<esc> [J
+=> 7f delBack
+<esc> [2K
+<esc> [1;94m▶ <esc> [m*pack
+<esc> [J
+=> 7f delBack
+<esc> [2K
+<esc> [1;94m▶ <esc> [m*pac
+<esc> [J
+=> 7f delBack
+<esc> [2K
+<esc> [1;94m▶ <esc> [m*pa
+<esc> [J
+=> 7f delBack
+<esc> [2K
+<esc> [1;94m▶ <esc> [m*p
+<esc> [J
+=> 7f delBack
+<esc> [2K
+<esc> [1;94m▶ <esc> [m*
+<esc> [J
+=> 7f delBack
+<esc> [2K
+<esc> [1;94m▶ <esc> [m
+<esc> [J
+=> 10 up
+=> 10 historyBack
+<esc> [2K
+<esc> [1;94m▶ <esc> [m(require "parquet" ".")
+<esc> [1m
+(
+<esc> [m
+<esc> [J
+=> 02 back
+<esc> [2K
+<esc> [1;94m▶ <esc> [m(require "parquet" ".")
+(
+<esc> [J
+=> 02 back
+<esc> [2K
+<esc> [1;94m▶ <esc> [m(require "parquet" ".")
+<esc> [J
+=> 02 back
+<esc> [2K
+<esc> [1;94m▶ <esc> [m(require "parquet" ".")
+<esc> [J
+=> 02 back
+<esc> [2K
+<esc> [1;94m▶ <esc> [m(require "parquet" ".")
+<esc> [J
+=> 02 back
+<esc> [2K
+<esc> [1;94m▶ <esc> [m(require "parquet" ".")
+<esc> [J
+=> 7f delBack
+<esc> [2K
+<esc> [1;94m▶ <esc> [m(require "parquet ".")
+<esc> [J
+=> 1b esc
+=> 62 backWord
+<esc> [2K
+<esc> [1;94m▶ <esc> [m(require "parquet ".")
+<esc> [J
+=> 04 delForward
+<esc> [2K
+<esc> [1;94m▶ <esc> [m(require parquet ".")
+<esc> [J
+=> 27 addByte
+'parquet ".")
+<esc> [J
+=> 0d enter
+<esc> [2K
+<esc> [1;94m▶ <esc> [m
+<esc> [J
+=> 04 delForward
+=> 04 done
