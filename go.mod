@@ -4,7 +4,7 @@ go 1.21
 
 require (
 	github.com/apache/arrow/go/v14 v14.0.0
-	github.com/ohler55/ojg v1.20.2
+	github.com/ohler55/ojg v1.21.0
 	github.com/ohler55/slip v0.7.0
 	golang.org/x/text v0.14.0
 )
