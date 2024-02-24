@@ -19,6 +19,7 @@ var (
 )
 
 func init() {
+	Pkg.Initialize(nil)
 	readerFlavor = flavors.DefFlavor("parquet-reader-flavor",
 		map[string]slip.Object{"filepath": nil},
 		nil,
@@ -34,6 +35,7 @@ func init() {
 access the content of that file.`),
 			},
 		},
+		&Pkg,
 	)
 	readerFlavor.DefMethod(":init", "", readerInitCaller(true))
 	readerFlavor.DefMethod(":close", "", readerCloseCaller(true))

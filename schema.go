@@ -17,6 +17,7 @@ var schemaFlavor *flavors.Flavor
 // file.
 
 func init() {
+	Pkg.Initialize(nil)
 	schemaFlavor = flavors.DefFlavor("parquet-schema-flavor",
 		map[string]slip.Object{},
 		nil,
@@ -26,6 +27,7 @@ func init() {
 				slip.String(`A parquet schema represents a parquet schema node.`),
 			},
 		},
+		&Pkg,
 	)
 	schemaFlavor.Final = true
 	schemaFlavor.DefMethod(":name", "", schemaNameCaller(true))
