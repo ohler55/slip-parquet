@@ -7,13 +7,14 @@ import (
 	"strings"
 	"testing"
 
-	pq "github.com/apache/arrow/go/v14/parquet"
-	"github.com/apache/arrow/go/v14/parquet/schema"
+	pq "github.com/apache/arrow/go/v15/parquet"
+	"github.com/apache/arrow/go/v15/parquet/schema"
 	"github.com/ohler55/ojg/tt"
 	"github.com/ohler55/slip"
-	"github.com/ohler55/slip-parquet/slipparquet"
 	"github.com/ohler55/slip/pkg/flavors"
 	"github.com/ohler55/slip/sliptest"
+
+	"github.com/ohler55/slip-parquet/slipparquet"
 )
 
 type badWriter int
@@ -521,7 +522,7 @@ func TestSchemaWrite2(t *testing.T) {
 	inst.Any = &fakeNode{
 		name: "fake",
 		typ:  schema.Group,
-		//physical:  2, //  but private
+		// physical:  2, //  but private
 		logical:   schema.NoLogicalType{},
 		converted: schema.ConvertedTypes.List,
 	}
@@ -532,7 +533,6 @@ func TestSchemaWrite2(t *testing.T) {
 }
 "`,
 	}).Test(t)
-
 }
 
 func setupSchemaTest(t *testing.T, filename string) *slip.Scope {

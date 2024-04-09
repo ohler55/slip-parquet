@@ -5,8 +5,8 @@ package slipparquet
 import (
 	"io"
 
-	"github.com/apache/arrow/go/v14/parquet/pqarrow"
-	"github.com/apache/arrow/go/v14/parquet/schema"
+	"github.com/apache/arrow/go/v15/parquet/pqarrow"
+	"github.com/apache/arrow/go/v15/parquet/schema"
 	"github.com/ohler55/slip"
 	"github.com/ohler55/slip/pkg/flavors"
 )

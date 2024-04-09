@@ -6,7 +6,7 @@ import (
 	"context"
 	"strings"
 
-	"github.com/apache/arrow/go/v14/parquet/pqarrow"
+	"github.com/apache/arrow/go/v15/parquet/pqarrow"
 	"github.com/ohler55/slip"
 	"github.com/ohler55/slip/pkg/cl"
 	"github.com/ohler55/slip/pkg/flavors"
@@ -14,9 +14,7 @@ import (
 
 const batchSize int64 = 4096
 
-var (
-	readerFlavor *flavors.Flavor
-)
+var readerFlavor *flavors.Flavor
 
 func init() {
 	Pkg.Initialize(nil)
