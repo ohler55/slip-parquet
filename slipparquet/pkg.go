@@ -18,7 +18,11 @@ var (
 
 func init() {
 	Pkg.Initialize(nil)
+	defReaderFlavor()
+	defSchemaFlavor()
+
+	slip.DefConstant(slip.Symbol("*parquet*"), &Pkg, "")
+
 	slip.AddPackage(&Pkg)
 	slip.UserPkg.Use(&Pkg)
-	Pkg.Set("*parquet*", &Pkg)
 }

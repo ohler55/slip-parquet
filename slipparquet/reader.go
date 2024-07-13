@@ -16,8 +16,7 @@ const batchSize int64 = 4096
 
 var readerFlavor *flavors.Flavor
 
-func init() {
-	Pkg.Initialize(nil)
+func defReaderFlavor() {
 	readerFlavor = flavors.DefFlavor("parquet-reader-flavor",
 		map[string]slip.Object{"filepath": nil},
 		nil,

@@ -16,8 +16,7 @@ var schemaFlavor *flavors.Flavor
 // Both the schema flavor and the parquet-schema function are defined in this
 // file.
 
-func init() {
-	Pkg.Initialize(nil)
+func defSchemaFlavor() {
 	schemaFlavor = flavors.DefFlavor("parquet-schema-flavor",
 		map[string]slip.Object{},
 		nil,
