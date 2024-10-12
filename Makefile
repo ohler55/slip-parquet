@@ -11,6 +11,6 @@ build:
 	go build -buildmode=plugin -o parquet.so *.go
 
 test: lint
-	go test -coverprofile=cov.out
+	go test -coverprofile=cov.out github.com/ohler55/slip-parquet/slipparquet
 
 .PHONY: all build

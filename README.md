@@ -8,8 +8,8 @@ The package is implemented as a Go plugin. All plugins require that
 the version of the code pulling in the plugin and the plugin version
 match. That that means is the plugin must be build with the same
 version of SLIP in order to make use of the `require` LISP function to
-load the parquet package. It's actually a bit mroe finicky than that
-though. The build must be done agains the actual source code and not
+load the parquet package. It's actually a bit more finicky than that
+though. The build must be done against the actual source code and not
 simply putting the version in the go.mod requires.
 
 First checkout the SLIP code for the tagged release. For example is a
@@ -22,7 +22,7 @@ Next make the .so file:
 make
 ```
 
-The parquet.so file should now exist. It can be copied to the
+The **parquet.so** file should now exist. It can be copied to the
 directory that `*package-load-path*` is set to or by providing the
 path to the directory containing the `parquet.so` file.
 
