@@ -346,7 +346,7 @@ func TestSchemaFields(t *testing.T) {
 			list := v.(slip.List)
 			tt.Equal(t, 3, len(list))
 			inst := list[0].(*flavors.Instance)
-			tt.Equal(t, "parquet-schema-flavor", inst.Flavor.Name())
+			tt.Equal(t, "parquet-schema-flavor", inst.Type.Name())
 		},
 	}).Test(t)
 }
