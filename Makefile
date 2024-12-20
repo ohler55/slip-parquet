@@ -8,6 +8,7 @@ lint:
 	golangci-lint run
 
 build:
+	go mod tidy
 	go build -buildmode=plugin -o parquet.so *.go
 
 test: lint
