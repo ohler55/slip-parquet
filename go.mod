@@ -6,8 +6,8 @@ toolchain go1.23.2
 
 require (
 	github.com/apache/arrow/go/v15 v15.0.2
-	github.com/ohler55/ojg v1.25.0
-	github.com/ohler55/slip v0.9.5
+	github.com/ohler55/ojg v1.26.0
+	github.com/ohler55/slip v0.9.8
 	golang.org/x/text v0.19.0
 )
 
