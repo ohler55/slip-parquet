@@ -2,12 +2,12 @@ module github.com/ohler55/slip-parquet
 
 go 1.23
 
-toolchain go1.23.2
+toolchain go1.23.5
 
 require (
 	github.com/apache/arrow/go/v15 v15.0.2
-	github.com/ohler55/ojg v1.26.0
-	github.com/ohler55/slip v0.9.8
+	github.com/ohler55/ojg v1.26.1
+	github.com/ohler55/slip v0.9.9
 	golang.org/x/text v0.19.0
 )
 
