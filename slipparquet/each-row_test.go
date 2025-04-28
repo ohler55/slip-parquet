@@ -13,8 +13,8 @@ import (
 func TestEachRowOk(t *testing.T) {
 	scope := slip.NewScope()
 	scope.Let("reader", nil)
-	_ = slip.ReadString(`(setq reader (parquet-open "testdata/primitive.parquet") rows nil)`).Eval(scope, nil)
-	defer func() { _ = slip.ReadString(`(send reader :close)`).Eval(scope, nil) }()
+	_ = slip.ReadString(`(setq reader (parquet-open "testdata/primitive.parquet") rows nil)`, scope).Eval(scope, nil)
+	defer func() { _ = slip.ReadString(`(send reader :close)`, scope).Eval(scope, nil) }()
 	(&sliptest.Function{
 		Scope:  scope,
 		Source: `(parquet-each-row reader (lambda (row) (setq rows (add rows row))) :assoc '(0 2))`,
@@ -39,8 +39,8 @@ func TestEachRowBadReader(t *testing.T) {
 func TestEachRowBadFormat(t *testing.T) {
 	scope := slip.NewScope()
 	scope.Let("reader", nil)
-	_ = slip.ReadString(`(setq reader (parquet-open "testdata/primitive.parquet"))`).Eval(scope, nil)
-	defer func() { _ = slip.ReadString(`(send reader :close)`).Eval(scope, nil) }()
+	_ = slip.ReadString(`(setq reader (parquet-open "testdata/primitive.parquet"))`, scope).Eval(scope, nil)
+	defer func() { _ = slip.ReadString(`(send reader :close)`, scope).Eval(scope, nil) }()
 	(&sliptest.Function{
 		Scope:     scope,
 		Source:    `(parquet-each-row reader (lambda (row) nil) :bad)`,

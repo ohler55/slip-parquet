@@ -12,7 +12,7 @@ import (
 func TestOpenOk(t *testing.T) {
 	scope := slip.NewScope()
 	scope.Let("reader", nil)
-	defer func() { _ = slip.ReadString(`(send reader :close)`).Eval(scope, nil) }()
+	defer func() { _ = slip.ReadString(`(send reader :close)`, scope).Eval(scope, nil) }()
 
 	(&sliptest.Function{
 		Scope:  scope,

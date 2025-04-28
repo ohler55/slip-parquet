@@ -12,7 +12,7 @@ import (
 func TestCloseOk(t *testing.T) {
 	scope := slip.NewScope()
 	scope.Let("reader", nil)
-	_ = slip.ReadString(`(setq reader (parquet-open "testdata/primitive.parquet"))`).Eval(scope, nil)
+	_ = slip.ReadString(`(setq reader (parquet-open "testdata/primitive.parquet"))`, scope).Eval(scope, nil)
 	(&sliptest.Function{
 		Scope:  scope,
 		Source: `(parquet-close reader)`,
