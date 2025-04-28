@@ -16,9 +16,9 @@ import (
 
 func TestReaderBasic(t *testing.T) {
 	scope := slip.NewScope()
-	pr := slip.ReadString(`(make-instance 'parquet-reader-flavor :file "testdata/primitive.parquet")`).Eval(scope, nil)
+	pr := slip.ReadString(`(make-instance 'parquet-reader-flavor :file "testdata/primitive.parquet")`, scope).Eval(scope, nil)
 	scope.Let("reader", pr)
-	defer func() { _ = slip.ReadString(`(send reader :close)`).Eval(scope, nil) }()
+	defer func() { _ = slip.ReadString(`(send reader :close)`, scope).Eval(scope, nil) }()
 	(&sliptest.Function{
 		Scope:  scope,
 		Source: `reader`,
@@ -28,9 +28,9 @@ func TestReaderBasic(t *testing.T) {
 
 func TestReaderFilepath(t *testing.T) {
 	scope := slip.NewScope()
-	pr := slip.ReadString(`(make-instance 'parquet-reader-flavor :file "testdata/primitive.parquet")`).Eval(scope, nil)
+	pr := slip.ReadString(`(make-instance 'parquet-reader-flavor :file "testdata/primitive.parquet")`, scope).Eval(scope, nil)
 	scope.Let("reader", pr)
-	defer func() { _ = slip.ReadString(`(send reader :close)`).Eval(scope, nil) }()
+	defer func() { _ = slip.ReadString(`(send reader :close)`, scope).Eval(scope, nil) }()
 	(&sliptest.Function{
 		Scope:  scope,
 		Source: `(send reader :filepath)`,
@@ -40,9 +40,9 @@ func TestReaderFilepath(t *testing.T) {
 
 func TestReaderVersion(t *testing.T) {
 	scope := slip.NewScope()
-	pr := slip.ReadString(`(make-instance 'parquet-reader-flavor :file "testdata/primitive.parquet")`).Eval(scope, nil)
+	pr := slip.ReadString(`(make-instance 'parquet-reader-flavor :file "testdata/primitive.parquet")`, scope).Eval(scope, nil)
 	scope.Let("reader", pr)
-	defer func() { _ = slip.ReadString(`(send reader :close)`).Eval(scope, nil) }()
+	defer func() { _ = slip.ReadString(`(send reader :close)`, scope).Eval(scope, nil) }()
 	(&sliptest.Function{
 		Scope:  scope,
 		Source: `(send reader :version)`,
@@ -52,9 +52,9 @@ func TestReaderVersion(t *testing.T) {
 
 func TestReaderCreatedBy(t *testing.T) {
 	scope := slip.NewScope()
-	pr := slip.ReadString(`(make-instance 'parquet-reader-flavor :file "testdata/primitive.parquet")`).Eval(scope, nil)
+	pr := slip.ReadString(`(make-instance 'parquet-reader-flavor :file "testdata/primitive.parquet")`, scope).Eval(scope, nil)
 	scope.Let("reader", pr)
-	defer func() { _ = slip.ReadString(`(send reader :close)`).Eval(scope, nil) }()
+	defer func() { _ = slip.ReadString(`(send reader :close)`, scope).Eval(scope, nil) }()
 	(&sliptest.Function{
 		Scope:  scope,
 		Source: `(send reader :created-by)`,
@@ -64,9 +64,9 @@ func TestReaderCreatedBy(t *testing.T) {
 
 func TestReaderRowCount(t *testing.T) {
 	scope := slip.NewScope()
-	pr := slip.ReadString(`(make-instance 'parquet-reader-flavor :file "testdata/primitive.parquet")`).Eval(scope, nil)
+	pr := slip.ReadString(`(make-instance 'parquet-reader-flavor :file "testdata/primitive.parquet")`, scope).Eval(scope, nil)
 	scope.Let("reader", pr)
-	defer func() { _ = slip.ReadString(`(send reader :close)`).Eval(scope, nil) }()
+	defer func() { _ = slip.ReadString(`(send reader :close)`, scope).Eval(scope, nil) }()
 	(&sliptest.Function{
 		Scope:  scope,
 		Source: `(send reader :row-count)`,
@@ -76,9 +76,9 @@ func TestReaderRowCount(t *testing.T) {
 
 func TestReaderColumnCount(t *testing.T) {
 	scope := slip.NewScope()
-	pr := slip.ReadString(`(make-instance 'parquet-reader-flavor :file "testdata/primitive.parquet")`).Eval(scope, nil)
+	pr := slip.ReadString(`(make-instance 'parquet-reader-flavor :file "testdata/primitive.parquet")`, scope).Eval(scope, nil)
 	scope.Let("reader", pr)
-	defer func() { _ = slip.ReadString(`(send reader :close)`).Eval(scope, nil) }()
+	defer func() { _ = slip.ReadString(`(send reader :close)`, scope).Eval(scope, nil) }()
 	(&sliptest.Function{
 		Scope:  scope,
 		Source: `(send reader :column-count)`,
@@ -88,9 +88,9 @@ func TestReaderColumnCount(t *testing.T) {
 
 func TestReaderSchema(t *testing.T) {
 	scope := slip.NewScope()
-	pr := slip.ReadString(`(make-instance 'parquet-reader-flavor :file "testdata/primitive.parquet")`).Eval(scope, nil)
+	pr := slip.ReadString(`(make-instance 'parquet-reader-flavor :file "testdata/primitive.parquet")`, scope).Eval(scope, nil)
 	scope.Let("reader", pr)
-	defer func() { _ = slip.ReadString(`(send reader :close)`).Eval(scope, nil) }()
+	defer func() { _ = slip.ReadString(`(send reader :close)`, scope).Eval(scope, nil) }()
 	(&sliptest.Function{
 		Scope:  scope,
 		Source: `(send reader :schema)`,
@@ -116,7 +116,7 @@ func TestReaderDocs(t *testing.T) {
 		":each-row",
 		":schema",
 	} {
-		_ = slip.ReadString(fmt.Sprintf(`(describe-method parquet-reader-flavor %s out)`, method)).Eval(scope, nil)
+		_ = slip.ReadString(fmt.Sprintf(`(describe-method parquet-reader-flavor %s out)`, method), scope).Eval(scope, nil)
 		tt.Equal(t, true, strings.Contains(out.String(), method))
 	}
 }
@@ -124,18 +124,18 @@ func TestReaderDocs(t *testing.T) {
 func TestReaderBadInitFile(t *testing.T) {
 	scope := slip.NewScope()
 	tt.Panic(t, func() {
-		_ = slip.ReadString(`(make-instance 'parquet-reader-flavor :file "no-file")`).Eval(scope, nil)
+		_ = slip.ReadString(`(make-instance 'parquet-reader-flavor :file "no-file")`, scope).Eval(scope, nil)
 	})
 	tt.Panic(t, func() {
-		_ = slip.ReadString(`(make-instance 'parquet-reader-flavor :file t)`).Eval(scope, nil)
+		_ = slip.ReadString(`(make-instance 'parquet-reader-flavor :file t)`, scope).Eval(scope, nil)
 	})
 }
 
 func TestReaderColumnsPrimitive(t *testing.T) {
 	scope := slip.NewScope()
-	pr := slip.ReadString(`(make-instance 'parquet-reader-flavor :file "testdata/primitive.parquet")`).Eval(scope, nil)
+	pr := slip.ReadString(`(make-instance 'parquet-reader-flavor :file "testdata/primitive.parquet")`, scope).Eval(scope, nil)
 	scope.Let("reader", pr)
-	defer func() { _ = slip.ReadString(`(send reader :close)`).Eval(scope, nil) }()
+	defer func() { _ = slip.ReadString(`(send reader :close)`, scope).Eval(scope, nil) }()
 
 	(&sliptest.Function{
 		Scope:  scope,
@@ -175,9 +175,9 @@ func TestReaderColumnsPrimitive(t *testing.T) {
 func TestReaderColumnsNestedList(t *testing.T) {
 	scope := slip.NewScope()
 	pr := slip.ReadString(
-		`(make-instance 'parquet-reader-flavor :file "testdata/nested-list.parquet")`).Eval(scope, nil)
+		`(make-instance 'parquet-reader-flavor :file "testdata/nested-list.parquet")`, scope).Eval(scope, nil)
 	scope.Let("reader", pr)
-	defer func() { _ = slip.ReadString(`(send reader :close)`).Eval(scope, nil) }()
+	defer func() { _ = slip.ReadString(`(send reader :close)`, scope).Eval(scope, nil) }()
 
 	(&sliptest.Function{
 		Scope:  scope,
@@ -199,10 +199,10 @@ func TestReaderColumnsNestedList(t *testing.T) {
 func TestReaderColumnsNestedMap(t *testing.T) {
 	scope := slip.NewScope()
 	pr := slip.ReadString(
-		`(make-instance 'parquet-reader-flavor :file "testdata/nested-maps.parquet")`).Eval(scope, nil)
+		`(make-instance 'parquet-reader-flavor :file "testdata/nested-maps.parquet")`, scope).Eval(scope, nil)
 	scope.Let("reader", pr)
 	scope.Set("*print-right-margin*", slip.Fixnum(80))
-	defer func() { _ = slip.ReadString(`(send reader :close)`).Eval(scope, nil) }()
+	defer func() { _ = slip.ReadString(`(send reader :close)`, scope).Eval(scope, nil) }()
 
 	(&sliptest.Function{
 		Scope:  scope,
@@ -224,9 +224,9 @@ func TestReaderColumnsNestedMap(t *testing.T) {
 func TestReaderColumnsNestedStruct(t *testing.T) {
 	scope := slip.NewScope()
 	pr := slip.ReadString(
-		`(make-instance 'parquet-reader-flavor :file "testdata/nested-struct.parquet")`).Eval(scope, nil)
+		`(make-instance 'parquet-reader-flavor :file "testdata/nested-struct.parquet")`, scope).Eval(scope, nil)
 	scope.Let("reader", pr)
-	defer func() { _ = slip.ReadString(`(send reader :close)`).Eval(scope, nil) }()
+	defer func() { _ = slip.ReadString(`(send reader :close)`, scope).Eval(scope, nil) }()
 
 	(&sliptest.Function{
 		Scope:  scope,
@@ -250,12 +250,12 @@ func TestReaderColumnsNestedStruct(t *testing.T) {
 func TestReaderColumnsBinary(t *testing.T) {
 	scope := slip.NewScope()
 	pr := slip.ReadString(
-		`(make-instance 'parquet-reader-flavor :file "testdata/binary.parquet")`).Eval(scope, nil)
+		`(make-instance 'parquet-reader-flavor :file "testdata/binary.parquet")`, scope).Eval(scope, nil)
 	scope.Let("reader", pr)
 	scope.Set("*print-right-margin*", slip.Fixnum(80))
 	scope.Set("*print-readably*", slip.True)
 	defer func() {
-		_ = slip.ReadString(`(progn (setq *print-readably* nil)(send reader :close))`).Eval(scope, nil)
+		_ = slip.ReadString(`(progn (setq *print-readably* nil)(send reader :close))`, scope).Eval(scope, nil)
 	}()
 
 	(&sliptest.Function{
@@ -273,9 +273,9 @@ func TestReaderColumnsBinary(t *testing.T) {
 
 func TestReaderColumnFixnum(t *testing.T) {
 	scope := slip.NewScope()
-	pr := slip.ReadString(`(make-instance 'parquet-reader-flavor :file "testdata/primitive.parquet")`).Eval(scope, nil)
+	pr := slip.ReadString(`(make-instance 'parquet-reader-flavor :file "testdata/primitive.parquet")`, scope).Eval(scope, nil)
 	scope.Let("reader", pr)
-	defer func() { _ = slip.ReadString(`(send reader :close)`).Eval(scope, nil) }()
+	defer func() { _ = slip.ReadString(`(send reader :close)`, scope).Eval(scope, nil) }()
 
 	(&sliptest.Function{
 		Scope:  scope,
@@ -293,9 +293,9 @@ func TestReaderColumnFixnum(t *testing.T) {
 
 func TestReaderColumnNamed(t *testing.T) {
 	scope := slip.NewScope()
-	pr := slip.ReadString(`(make-instance 'parquet-reader-flavor :file "testdata/primitive.parquet")`).Eval(scope, nil)
+	pr := slip.ReadString(`(make-instance 'parquet-reader-flavor :file "testdata/primitive.parquet")`, scope).Eval(scope, nil)
 	scope.Let("reader", pr)
-	defer func() { _ = slip.ReadString(`(send reader :close)`).Eval(scope, nil) }()
+	defer func() { _ = slip.ReadString(`(send reader :close)`, scope).Eval(scope, nil) }()
 
 	(&sliptest.Function{
 		Scope:  scope,
@@ -316,9 +316,9 @@ func TestReaderColumnNamed(t *testing.T) {
 func TestReaderColumnNested(t *testing.T) {
 	scope := slip.NewScope()
 	pr := slip.ReadString(
-		`(make-instance 'parquet-reader-flavor :file "testdata/nested-maps.parquet")`).Eval(scope, nil)
+		`(make-instance 'parquet-reader-flavor :file "testdata/nested-maps.parquet")`, scope).Eval(scope, nil)
 	scope.Let("reader", pr)
-	defer func() { _ = slip.ReadString(`(send reader :close)`).Eval(scope, nil) }()
+	defer func() { _ = slip.ReadString(`(send reader :close)`, scope).Eval(scope, nil) }()
 
 	(&sliptest.Function{
 		Scope:  scope,
@@ -334,9 +334,9 @@ func TestReaderColumnNested(t *testing.T) {
 
 func TestReaderColumnErrors(t *testing.T) {
 	scope := slip.NewScope()
-	pr := slip.ReadString(`(make-instance 'parquet-reader-flavor :file "testdata/primitive.parquet")`).Eval(scope, nil)
+	pr := slip.ReadString(`(make-instance 'parquet-reader-flavor :file "testdata/primitive.parquet")`, scope).Eval(scope, nil)
 	scope.Let("reader", pr)
-	defer func() { _ = slip.ReadString(`(send reader :close)`).Eval(scope, nil) }()
+	defer func() { _ = slip.ReadString(`(send reader :close)`, scope).Eval(scope, nil) }()
 
 	(&sliptest.Function{
 		Scope:     scope,
@@ -352,10 +352,10 @@ func TestReaderColumnErrors(t *testing.T) {
 
 func TestReaderRowsPrimitive(t *testing.T) {
 	scope := slip.NewScope()
-	pr := slip.ReadString(`(make-instance 'parquet-reader-flavor :file "testdata/primitive.parquet")`).Eval(scope, nil)
+	pr := slip.ReadString(`(make-instance 'parquet-reader-flavor :file "testdata/primitive.parquet")`, scope).Eval(scope, nil)
 	scope.Let("reader", pr)
 	scope.Set("*print-right-margin*", slip.Fixnum(80))
-	defer func() { _ = slip.ReadString(`(send reader :close)`).Eval(scope, nil) }()
+	defer func() { _ = slip.ReadString(`(send reader :close)`, scope).Eval(scope, nil) }()
 
 	(&sliptest.Function{
 		Scope:  scope,
@@ -396,10 +396,10 @@ func TestReaderRowsPrimitive(t *testing.T) {
 func TestReaderRowsNested(t *testing.T) {
 	scope := slip.NewScope()
 	pr := slip.ReadString(
-		`(make-instance 'parquet-reader-flavor :file "testdata/nested-maps.parquet")`).Eval(scope, nil)
+		`(make-instance 'parquet-reader-flavor :file "testdata/nested-maps.parquet")`, scope).Eval(scope, nil)
 	scope.Let("reader", pr)
 	scope.Set("*print-right-margin*", slip.Fixnum(80))
-	defer func() { _ = slip.ReadString(`(send reader :close)`).Eval(scope, nil) }()
+	defer func() { _ = slip.ReadString(`(send reader :close)`, scope).Eval(scope, nil) }()
 	(&sliptest.Function{
 		Scope:  scope,
 		Source: `(send reader :rows :list)`,
@@ -438,9 +438,9 @@ func TestReaderRowsNested(t *testing.T) {
 
 func TestReaderRowsError(t *testing.T) {
 	scope := slip.NewScope()
-	pr := slip.ReadString(`(make-instance 'parquet-reader-flavor :file "testdata/primitive.parquet")`).Eval(scope, nil)
+	pr := slip.ReadString(`(make-instance 'parquet-reader-flavor :file "testdata/primitive.parquet")`, scope).Eval(scope, nil)
 	scope.Let("reader", pr)
-	defer func() { _ = slip.ReadString(`(send reader :close)`).Eval(scope, nil) }()
+	defer func() { _ = slip.ReadString(`(send reader :close)`, scope).Eval(scope, nil) }()
 
 	(&sliptest.Function{
 		Scope:     scope,
@@ -461,11 +461,11 @@ func TestReaderRowsError(t *testing.T) {
 
 func TestReaderEachRowPrimitive(t *testing.T) {
 	scope := slip.NewScope()
-	pr := slip.ReadString(`(make-instance 'parquet-reader-flavor :file "testdata/primitive.parquet")`).Eval(scope, nil)
+	pr := slip.ReadString(`(make-instance 'parquet-reader-flavor :file "testdata/primitive.parquet")`, scope).Eval(scope, nil)
 	scope.Set("*print-right-margin*", slip.Fixnum(80))
 	scope.Let("reader", pr)
 	scope.Let("result", nil)
-	defer func() { _ = slip.ReadString(`(send reader :close)`).Eval(scope, nil) }()
+	defer func() { _ = slip.ReadString(`(send reader :close)`, scope).Eval(scope, nil) }()
 
 	(&sliptest.Function{
 		Scope: scope,

@@ -28,65 +28,65 @@ func TestSchemaDocs(t *testing.T) {
 	var out strings.Builder
 	scope.Let(slip.Symbol("out"), &slip.OutputStream{Writer: &out})
 
-	_ = slip.ReadString(`(describe-method parquet-schema-flavor :name out)`).Eval(scope, nil)
+	_ = slip.ReadString(`(describe-method parquet-schema-flavor :name out)`, scope).Eval(scope, nil)
 	tt.Equal(t, true, strings.Contains(out.String(), ":name"))
 
 	out.Reset()
-	_ = slip.ReadString(`(describe-method parquet-schema-flavor :type out)`).Eval(scope, nil)
+	_ = slip.ReadString(`(describe-method parquet-schema-flavor :type out)`, scope).Eval(scope, nil)
 	tt.Equal(t, true, strings.Contains(out.String(), ":type"))
 
 	out.Reset()
-	_ = slip.ReadString(`(describe-method parquet-schema-flavor :field-id out)`).Eval(scope, nil)
+	_ = slip.ReadString(`(describe-method parquet-schema-flavor :field-id out)`, scope).Eval(scope, nil)
 	tt.Equal(t, true, strings.Contains(out.String(), ":field-id"))
 
 	out.Reset()
-	_ = slip.ReadString(`(describe-method parquet-schema-flavor :repetition out)`).Eval(scope, nil)
+	_ = slip.ReadString(`(describe-method parquet-schema-flavor :repetition out)`, scope).Eval(scope, nil)
 	tt.Equal(t, true, strings.Contains(out.String(), ":repetition"))
 
 	out.Reset()
-	_ = slip.ReadString(`(describe-method parquet-schema-flavor :logical-type out)`).Eval(scope, nil)
+	_ = slip.ReadString(`(describe-method parquet-schema-flavor :logical-type out)`, scope).Eval(scope, nil)
 	tt.Equal(t, true, strings.Contains(out.String(), ":logical-type"))
 
 	out.Reset()
-	_ = slip.ReadString(`(describe-method parquet-schema-flavor :converted-type out)`).Eval(scope, nil)
+	_ = slip.ReadString(`(describe-method parquet-schema-flavor :converted-type out)`, scope).Eval(scope, nil)
 	tt.Equal(t, true, strings.Contains(out.String(), ":converted-type"))
 
 	out.Reset()
-	_ = slip.ReadString(`(describe-method parquet-schema-flavor :path out)`).Eval(scope, nil)
+	_ = slip.ReadString(`(describe-method parquet-schema-flavor :path out)`, scope).Eval(scope, nil)
 	tt.Equal(t, true, strings.Contains(out.String(), ":path"))
 
 	out.Reset()
-	_ = slip.ReadString(`(describe-method parquet-schema-flavor :type-length out)`).Eval(scope, nil)
+	_ = slip.ReadString(`(describe-method parquet-schema-flavor :type-length out)`, scope).Eval(scope, nil)
 	tt.Equal(t, true, strings.Contains(out.String(), ":type-length"))
 
 	out.Reset()
-	_ = slip.ReadString(`(describe-method parquet-schema-flavor :precision out)`).Eval(scope, nil)
+	_ = slip.ReadString(`(describe-method parquet-schema-flavor :precision out)`, scope).Eval(scope, nil)
 	tt.Equal(t, true, strings.Contains(out.String(), ":precision"))
 
 	out.Reset()
-	_ = slip.ReadString(`(describe-method parquet-schema-flavor :scale out)`).Eval(scope, nil)
+	_ = slip.ReadString(`(describe-method parquet-schema-flavor :scale out)`, scope).Eval(scope, nil)
 	tt.Equal(t, true, strings.Contains(out.String(), ":scale"))
 
 	out.Reset()
-	_ = slip.ReadString(`(describe-method parquet-schema-flavor :write out)`).Eval(scope, nil)
+	_ = slip.ReadString(`(describe-method parquet-schema-flavor :write out)`, scope).Eval(scope, nil)
 	tt.Equal(t, true, strings.Contains(out.String(), ":write"))
 
 	out.Reset()
-	_ = slip.ReadString(`(describe-method parquet-schema-flavor :parent out)`).Eval(scope, nil)
+	_ = slip.ReadString(`(describe-method parquet-schema-flavor :parent out)`, scope).Eval(scope, nil)
 	tt.Equal(t, true, strings.Contains(out.String(), ":parent"))
 
 	out.Reset()
-	_ = slip.ReadString(`(describe-method parquet-schema-flavor :fields out)`).Eval(scope, nil)
+	_ = slip.ReadString(`(describe-method parquet-schema-flavor :fields out)`, scope).Eval(scope, nil)
 	tt.Equal(t, true, strings.Contains(out.String(), ":fields"))
 
 	out.Reset()
-	_ = slip.ReadString(`(describe-method parquet-schema-flavor :find out)`).Eval(scope, nil)
+	_ = slip.ReadString(`(describe-method parquet-schema-flavor :find out)`, scope).Eval(scope, nil)
 	tt.Equal(t, true, strings.Contains(out.String(), ":find"))
 }
 
 func TestSchemaFindName(t *testing.T) {
 	scope := setupSchemaTest(t, "nested-maps.parquet")
-	defer func() { _ = slip.ReadString(`(send reader :close)`).Eval(scope, nil) }()
+	defer func() { _ = slip.ReadString(`(send reader :close)`, scope).Eval(scope, nil) }()
 
 	(&sliptest.Function{
 		Scope:  scope,
@@ -142,7 +142,7 @@ func TestSchemaFindName(t *testing.T) {
 
 func TestSchemaType(t *testing.T) {
 	scope := setupSchemaTest(t, "nested-maps.parquet")
-	defer func() { _ = slip.ReadString(`(send reader :close)`).Eval(scope, nil) }()
+	defer func() { _ = slip.ReadString(`(send reader :close)`, scope).Eval(scope, nil) }()
 
 	(&sliptest.Function{
 		Scope:  scope,
@@ -158,7 +158,7 @@ func TestSchemaType(t *testing.T) {
 
 func TestSchemaFieldID(t *testing.T) {
 	scope := setupSchemaTest(t, "primitive.parquet")
-	defer func() { _ = slip.ReadString(`(send reader :close)`).Eval(scope, nil) }()
+	defer func() { _ = slip.ReadString(`(send reader :close)`, scope).Eval(scope, nil) }()
 
 	(&sliptest.Function{
 		Scope:  scope,
@@ -179,7 +179,7 @@ func TestSchemaFieldID(t *testing.T) {
 
 func TestSchemaLogicalType(t *testing.T) {
 	scope := setupSchemaTest(t, "byte-array-decimal.parquet")
-	defer func() { _ = slip.ReadString(`(send reader :close)`).Eval(scope, nil) }()
+	defer func() { _ = slip.ReadString(`(send reader :close)`, scope).Eval(scope, nil) }()
 
 	(&sliptest.Function{
 		Scope:  scope,
@@ -195,7 +195,7 @@ func TestSchemaLogicalType(t *testing.T) {
 
 func TestSchemaConvertedType(t *testing.T) {
 	scope := setupSchemaTest(t, "byte-array-decimal.parquet")
-	defer func() { _ = slip.ReadString(`(send reader :close)`).Eval(scope, nil) }()
+	defer func() { _ = slip.ReadString(`(send reader :close)`, scope).Eval(scope, nil) }()
 
 	(&sliptest.Function{
 		Scope:  scope,
@@ -211,7 +211,7 @@ func TestSchemaConvertedType(t *testing.T) {
 
 func TestSchemaPath(t *testing.T) {
 	scope := setupSchemaTest(t, "nested-maps.parquet")
-	defer func() { _ = slip.ReadString(`(send reader :close)`).Eval(scope, nil) }()
+	defer func() { _ = slip.ReadString(`(send reader :close)`, scope).Eval(scope, nil) }()
 
 	(&sliptest.Function{
 		Scope:  scope,
@@ -227,7 +227,7 @@ func TestSchemaPath(t *testing.T) {
 
 func TestSchemaTypeLength(t *testing.T) {
 	scope := setupSchemaTest(t, "primitive.parquet")
-	defer func() { _ = slip.ReadString(`(send reader :close)`).Eval(scope, nil) }()
+	defer func() { _ = slip.ReadString(`(send reader :close)`, scope).Eval(scope, nil) }()
 
 	(&sliptest.Function{
 		Scope:  scope,
@@ -253,7 +253,7 @@ func TestSchemaTypeLength(t *testing.T) {
 
 func TestSchemaPrecision(t *testing.T) {
 	scope := setupSchemaTest(t, "byte-array-decimal.parquet")
-	defer func() { _ = slip.ReadString(`(send reader :close)`).Eval(scope, nil) }()
+	defer func() { _ = slip.ReadString(`(send reader :close)`, scope).Eval(scope, nil) }()
 
 	(&sliptest.Function{
 		Scope:  scope,
@@ -284,7 +284,7 @@ func TestSchemaPrecision(t *testing.T) {
 
 func TestSchemaScale(t *testing.T) {
 	scope := setupSchemaTest(t, "byte-array-decimal.parquet")
-	defer func() { _ = slip.ReadString(`(send reader :close)`).Eval(scope, nil) }()
+	defer func() { _ = slip.ReadString(`(send reader :close)`, scope).Eval(scope, nil) }()
 
 	(&sliptest.Function{
 		Scope:  scope,
@@ -300,7 +300,7 @@ func TestSchemaScale(t *testing.T) {
 
 func TestSchemaRepetition(t *testing.T) {
 	scope := setupSchemaTest(t, "nested-maps.parquet")
-	defer func() { _ = slip.ReadString(`(send reader :close)`).Eval(scope, nil) }()
+	defer func() { _ = slip.ReadString(`(send reader :close)`, scope).Eval(scope, nil) }()
 
 	(&sliptest.Function{
 		Scope:  scope,
@@ -321,7 +321,7 @@ func TestSchemaRepetition(t *testing.T) {
 
 func TestSchemaParent(t *testing.T) {
 	scope := setupSchemaTest(t, "nested-maps.parquet")
-	defer func() { _ = slip.ReadString(`(send reader :close)`).Eval(scope, nil) }()
+	defer func() { _ = slip.ReadString(`(send reader :close)`, scope).Eval(scope, nil) }()
 
 	(&sliptest.Function{
 		Scope:  scope,
@@ -337,7 +337,7 @@ func TestSchemaParent(t *testing.T) {
 
 func TestSchemaFields(t *testing.T) {
 	scope := setupSchemaTest(t, "nested-maps.parquet")
-	defer func() { _ = slip.ReadString(`(send reader :close)`).Eval(scope, nil) }()
+	defer func() { _ = slip.ReadString(`(send reader :close)`, scope).Eval(scope, nil) }()
 
 	(&sliptest.Function{
 		Scope:  scope,
@@ -354,7 +354,7 @@ func TestSchemaFields(t *testing.T) {
 func TestSchemaWrite(t *testing.T) {
 	var out strings.Builder
 	scope := setupSchemaTest(t, "nested-maps.parquet")
-	defer func() { _ = slip.ReadString(`(send reader :close)`).Eval(scope, nil) }()
+	defer func() { _ = slip.ReadString(`(send reader :close)`, scope).Eval(scope, nil) }()
 	scope.Let("out", &slip.OutputStream{Writer: &out})
 
 	(&sliptest.Function{
@@ -538,9 +538,9 @@ func TestSchemaWrite2(t *testing.T) {
 func setupSchemaTest(t *testing.T, filename string) *slip.Scope {
 	scope := slip.NewScope()
 	pr := slip.ReadString(
-		fmt.Sprintf(`(make-instance 'parquet-reader-flavor :file "testdata/%s")`, filename)).Eval(scope, nil)
+		fmt.Sprintf(`(make-instance 'parquet-reader-flavor :file "testdata/%s")`, filename), scope).Eval(scope, nil)
 	scope.Let("reader", pr)
-	schema := slip.ReadString(`(send reader :schema)`).Eval(scope, nil)
+	schema := slip.ReadString(`(send reader :schema)`, scope).Eval(scope, nil)
 	scope.Let("schema", schema)
 
 	return scope
@@ -549,8 +549,8 @@ func setupSchemaTest(t *testing.T, filename string) *slip.Scope {
 func TestSchemaOk(t *testing.T) {
 	scope := slip.NewScope()
 	scope.Let("reader", nil)
-	_ = slip.ReadString(`(setq reader (parquet-open "testdata/primitive.parquet"))`).Eval(scope, nil)
-	defer func() { _ = slip.ReadString(`(send reader :close)`).Eval(scope, nil) }()
+	_ = slip.ReadString(`(setq reader (parquet-open "testdata/primitive.parquet"))`, scope).Eval(scope, nil)
+	defer func() { _ = slip.ReadString(`(send reader :close)`, scope).Eval(scope, nil) }()
 	(&sliptest.Function{
 		Scope:  scope,
 		Source: `(parquet-schema reader)`,
