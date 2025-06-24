@@ -17,11 +17,16 @@ var (
 )
 
 func init() {
-	Pkg.Initialize(nil)
+	Pkg.Initialize(map[string]*slip.VarVal{
+		"*parquet*": {
+			Val:    &Pkg,
+			Const:  true,
+			Export: true,
+			Doc:    `The parquet package.`,
+		},
+	})
 	defReaderFlavor()
 	defSchemaFlavor()
-
-	slip.DefConstant(slip.Symbol("*parquet*"), &Pkg, "")
 
 	slip.AddPackage(&Pkg)
 	slip.UserPkg.Use(&Pkg)
