@@ -73,12 +73,19 @@ func (caller readerInitCaller) Call(s *slip.Scope, args slip.List, _ int) slip.O
 	return nil
 }
 
-func (caller readerInitCaller) Docs() string {
-	return `__:init__ &key _file_
-   _:file_ the path to a parquet file
-
-Sets the initial values when _make-instance_ is called.
-`
+func (caller readerInitCaller) FuncDocs() *slip.FuncDoc {
+	return &slip.FuncDoc{
+		Name: ":init",
+		Text: "Sets the initial value when _make-instance_ is called.",
+		Args: []*slip.DocArg{
+			{Name: "&key"},
+			{
+				Name: ":file",
+				Type: "string",
+				Text: "The path to a parquet file.",
+			},
+		},
+	}
 }
 
 type readerCloseCaller bool
@@ -91,11 +98,11 @@ func (caller readerCloseCaller) Call(s *slip.Scope, args slip.List, _ int) slip.
 	return nil
 }
 
-func (caller readerCloseCaller) Docs() string {
-	return `__:close__ => _nil_
-
-Close the reader.
-`
+func (caller readerCloseCaller) FuncDocs() *slip.FuncDoc {
+	return &slip.FuncDoc{
+		Name: ":close",
+		Text: "Close the reader.",
+	}
 }
 
 type readerVersionCaller bool
@@ -108,11 +115,12 @@ func (caller readerVersionCaller) Call(s *slip.Scope, args slip.List, _ int) (re
 	return
 }
 
-func (caller readerVersionCaller) Docs() string {
-	return `__:version__ => _string_
-
-Returns the version of the reader file.
-`
+func (caller readerVersionCaller) FuncDocs() *slip.FuncDoc {
+	return &slip.FuncDoc{
+		Name:   ":version",
+		Text:   "Returns the version of the reader file.",
+		Return: "string",
+	}
 }
 
 type readerCreatedByCaller bool
@@ -125,11 +133,12 @@ func (caller readerCreatedByCaller) Call(s *slip.Scope, args slip.List, _ int) (
 	return
 }
 
-func (caller readerCreatedByCaller) Docs() string {
-	return `__:created-by__ => _string_
-
-Returns a description of the application that created of the reader file.
-`
+func (caller readerCreatedByCaller) FuncDocs() *slip.FuncDoc {
+	return &slip.FuncDoc{
+		Name:   ":created-by",
+		Text:   "Returns a description of the application that created of the reader file.",
+		Return: "string",
+	}
 }
 
 type readerRowCountCaller bool
@@ -142,11 +151,12 @@ func (caller readerRowCountCaller) Call(s *slip.Scope, args slip.List, _ int) (r
 	return
 }
 
-func (caller readerRowCountCaller) Docs() string {
-	return `__:row-count__ => _fixnum_
-
-Returns the number of rows in the reader file.
-`
+func (caller readerRowCountCaller) FuncDocs() *slip.FuncDoc {
+	return &slip.FuncDoc{
+		Name:   ":row-count",
+		Text:   "Returns the number of rows in the reader file.",
+		Return: "fixnum",
+	}
 }
 
 type readerColumnCountCaller bool
@@ -163,11 +173,12 @@ func (caller readerColumnCountCaller) Call(s *slip.Scope, args slip.List, _ int)
 	return
 }
 
-func (caller readerColumnCountCaller) Docs() string {
-	return `__:column-count__ => _fixnum_
-
-Returns the number of columes int the reader file.
-`
+func (caller readerColumnCountCaller) FuncDocs() *slip.FuncDoc {
+	return &slip.FuncDoc{
+		Name:   ":column-count",
+		Text:   "Returns the number of columns in the reader file.",
+		Return: "fixnum",
+	}
 }
 
 type readerSchemaCaller bool
@@ -180,11 +191,12 @@ func (caller readerSchemaCaller) Call(s *slip.Scope, args slip.List, _ int) (res
 	return
 }
 
-func (caller readerSchemaCaller) Docs() string {
-	return `__:schema__ => _list_
-
-Returns the schema of the reader file.
-`
+func (caller readerSchemaCaller) FuncDocs() *slip.FuncDoc {
+	return &slip.FuncDoc{
+		Name:   ":schema",
+		Text:   "Returns the schema of the reader file.",
+		Return: "list",
+	}
 }
 
 type readerColumnsCaller bool
@@ -207,11 +219,12 @@ func (caller readerColumnsCaller) Call(s *slip.Scope, args slip.List, _ int) (re
 	return
 }
 
-func (caller readerColumnsCaller) Docs() string {
-	return `__:columns__ => _list_
-
-Returns the columns of the reader file.
-`
+func (caller readerColumnsCaller) FuncDocs() *slip.FuncDoc {
+	return &slip.FuncDoc{
+		Name:   ":columns",
+		Text:   "Returns the columns of the reader file.",
+		Return: "list",
+	}
 }
 
 type readerColumnCaller bool
@@ -219,7 +232,7 @@ type readerColumnCaller bool
 func (caller readerColumnCaller) Call(s *slip.Scope, args slip.List, _ int) (result slip.Object) {
 	obj := s.Get("self").(*flavors.Instance)
 	if len(args) != 1 {
-		flavors.PanicMethodArgChoice(obj, ":column", len(args), "1")
+		slip.PanicMethodArgChoice(obj, ":column", len(args), "1")
 	}
 	if fr, ok := obj.Any.(*pqarrow.FileReader); ok {
 		schem, err := fr.Schema()
@@ -233,12 +246,19 @@ func (caller readerColumnCaller) Call(s *slip.Scope, args slip.List, _ int) (res
 	return
 }
 
-func (caller readerColumnCaller) Docs() string {
-	return `__:column__ _id_ => _list_
-   _id_ the name or numeric index of the column to read.
-
-Returns the specified column of the reader file.
-`
+func (caller readerColumnCaller) FuncDocs() *slip.FuncDoc {
+	return &slip.FuncDoc{
+		Name: ":column",
+		Text: "Returns the specified column of the reader file.",
+		Args: []*slip.DocArg{
+			{
+				Name: "id",
+				Type: "string|fixnum",
+				Text: "The name or numeric index of the column to read.",
+			},
+		},
+		Return: "list",
+	}
 }
 
 func (caller readerRowsCaller) Call(s *slip.Scope, args slip.List, _ int) (result slip.Object) {
@@ -263,15 +283,27 @@ func (caller readerRowsCaller) Call(s *slip.Scope, args slip.List, _ int) (resul
 	return
 }
 
-func (caller readerRowsCaller) Docs() string {
-	return `__:rows__ _format_ &optional _column-ids_ => _list_
-   _format_ can be one of _:list_ for a list of column values in order,
+func (caller readerRowsCaller) FuncDocs() *slip.FuncDoc {
+	return &slip.FuncDoc{
+		Name: ":rows",
+		Text: "Returns the rows of the reader file.",
+		Args: []*slip.DocArg{
+			{
+				Name: "format",
+				Type: "symbol",
+				Text: `Can be one of _:list_ for a list of column values in order,
 _:assoc_ for column names as the car and the values as the cdr of each
-element in an assoc list for each key value pair.
-   _column-ids_ is a list of the column indexes or names for the columns to get values from.
-
-Returns the rows of the reader file.
-`
+element in an assoc list for each key value pair.`,
+			},
+			{Name: "&optional"},
+			{
+				Name: "column-ids",
+				Type: "list",
+				Text: "A list of the column indexes or names for the columns to get values from.",
+			},
+		},
+		Return: "list",
+	}
 }
 
 type readerEachRowCaller bool
@@ -297,16 +329,32 @@ func (caller readerEachRowCaller) Call(s *slip.Scope, args slip.List, depth int)
 	return nil
 }
 
-func (caller readerEachRowCaller) Docs() string {
-	return `__:each-row__ _function_ _format_ &optional _column-ids_ => _nil_
-   _function_ a function or lambda to call on each row.
-   _format_ can be one of _:list_ for a list of column values in order,
+func (caller readerEachRowCaller) FuncDocs() *slip.FuncDoc {
+	return &slip.FuncDoc{
+		Name: ":each-row",
+		Text: "Calls the _function_ on each row.",
+		Args: []*slip.DocArg{
+			{
+				Name: "function",
+				Type: "symbol|lambda",
+				Text: "A function or lambda to call on each row.",
+			},
+			{
+				Name: "format",
+				Type: "symbol",
+				Text: `Can be one of _:list_ for a list of column values in order,
 _:assoc_ for column names as the car and the values as the cdr of each
-element in an assoc list for each key value pair.
-   _column-ids_ is a list of the column indexes or names for the columns to get values from.
-
-Calls the _function_ on each row.
-`
+element in an assoc list for each key value pair.`,
+			},
+			{Name: "&optional"},
+			{
+				Name: "column-ids",
+				Type: "list",
+				Text: "A list of the column indexes or names for the columns to get values from.",
+			},
+		},
+		Return: "list",
+	}
 }
 
 func readColumn(cr *pqarrow.ColumnReader) (result slip.List) {

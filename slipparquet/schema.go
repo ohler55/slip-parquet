@@ -105,11 +105,12 @@ func (caller schemaNameCaller) Call(s *slip.Scope, args slip.List, _ int) (resul
 	return
 }
 
-func (caller schemaNameCaller) Docs() string {
-	return `__:name__ => _string_
-
-Returns the name of the schema node.
-`
+func (caller schemaNameCaller) FuncDocs() *slip.FuncDoc {
+	return &slip.FuncDoc{
+		Name:   ":name",
+		Text:   "Returns the name of the schema node.",
+		Return: "string",
+	}
 }
 
 type schemaTypeCaller bool
@@ -126,11 +127,12 @@ func (caller schemaTypeCaller) Call(s *slip.Scope, args slip.List, _ int) (resul
 	return
 }
 
-func (caller schemaTypeCaller) Docs() string {
-	return `__:type__ => _string_
-
-Returns the type of the schema node which can be :group or :primitive.
-`
+func (caller schemaTypeCaller) FuncDocs() *slip.FuncDoc {
+	return &slip.FuncDoc{
+		Name:   ":type",
+		Text:   "Returns the type of the schema node which can be :group or :primitive.",
+		Return: "string",
+	}
 }
 
 type schemaFieldIDCaller bool
@@ -145,11 +147,12 @@ func (caller schemaFieldIDCaller) Call(s *slip.Scope, args slip.List, _ int) (re
 	return
 }
 
-func (caller schemaFieldIDCaller) Docs() string {
-	return `__:field-id__ => _fixnum_|_nil_
-
-Returns the field ID of the schema node if there is a non negative ID.
-`
+func (caller schemaFieldIDCaller) FuncDocs() *slip.FuncDoc {
+	return &slip.FuncDoc{
+		Name:   ":field-id",
+		Text:   "Returns the field ID of the schema node if there is a non negative ID.",
+		Return: "fixnum|nil",
+	}
 }
 
 type schemaLogicalTypeCaller bool
@@ -164,11 +167,12 @@ func (caller schemaLogicalTypeCaller) Call(s *slip.Scope, args slip.List, _ int)
 	return
 }
 
-func (caller schemaLogicalTypeCaller) Docs() string {
-	return `__:logical-type__ => _string_
-
-Returns the logical type of the schema node.
-`
+func (caller schemaLogicalTypeCaller) FuncDocs() *slip.FuncDoc {
+	return &slip.FuncDoc{
+		Name:   ":logical-type",
+		Text:   "Returns the logical type of the schema node.",
+		Return: "string",
+	}
 }
 
 type schemaConvertedTypeCaller bool
@@ -183,11 +187,12 @@ func (caller schemaConvertedTypeCaller) Call(s *slip.Scope, args slip.List, _ in
 	return
 }
 
-func (caller schemaConvertedTypeCaller) Docs() string {
-	return `__:converted-type__ => _string_
-
-Returns the converted type of the schema node.
-`
+func (caller schemaConvertedTypeCaller) FuncDocs() *slip.FuncDoc {
+	return &slip.FuncDoc{
+		Name:   ":converted-type",
+		Text:   "Returns the converted type of the schema node.",
+		Return: "string",
+	}
 }
 
 type schemaPathCaller bool
@@ -200,11 +205,12 @@ func (caller schemaPathCaller) Call(s *slip.Scope, args slip.List, _ int) (resul
 	return
 }
 
-func (caller schemaPathCaller) Docs() string {
-	return `__:path__ => _string_
-
-Returns the path of the schema node.
-`
+func (caller schemaPathCaller) FuncDocs() *slip.FuncDoc {
+	return &slip.FuncDoc{
+		Name:   ":path",
+		Text:   "Returns the path of the schema node.",
+		Return: "string",
+	}
 }
 
 type hasLength interface {
@@ -223,11 +229,12 @@ func (caller schemaTypeLengthCaller) Call(s *slip.Scope, args slip.List, _ int) 
 	return
 }
 
-func (caller schemaTypeLengthCaller) Docs() string {
-	return `__:type-length__ => _fixnum_|_nil_
-
-Returns the type length of the schema node if the type has length of _nil_ otherwise.
-`
+func (caller schemaTypeLengthCaller) FuncDocs() *slip.FuncDoc {
+	return &slip.FuncDoc{
+		Name:   ":type-length",
+		Text:   "Returns the type length of the schema node if the type has length of _nil_ otherwise.",
+		Return: "fixnum|nil",
+	}
 }
 
 type schemaPrecisionCaller bool
@@ -240,11 +247,12 @@ func (caller schemaPrecisionCaller) Call(s *slip.Scope, args slip.List, _ int) (
 	return
 }
 
-func (caller schemaPrecisionCaller) Docs() string {
-	return `__:precision__ => _fixnum_
-
-Returns the type precision of the schema node if the type has precision of _nil_ otherwise.
-`
+func (caller schemaPrecisionCaller) FuncDocs() *slip.FuncDoc {
+	return &slip.FuncDoc{
+		Name:   ":precision",
+		Text:   "Returns the type precision of the schema node if the type has precision of _nil_ otherwise.",
+		Return: "fixnum|nil",
+	}
 }
 
 type schemaScaleCaller bool
@@ -257,11 +265,12 @@ func (caller schemaScaleCaller) Call(s *slip.Scope, args slip.List, _ int) (resu
 	return
 }
 
-func (caller schemaScaleCaller) Docs() string {
-	return `__:scale__ => _fixnum_|_nil_
-
-Returns the type scale of the schema node if the type has scale of _nil_ otherwise.
-`
+func (caller schemaScaleCaller) FuncDocs() *slip.FuncDoc {
+	return &slip.FuncDoc{
+		Name:   ":scale",
+		Text:   "Returns the type scale of the schema node if the type has scale of _nil_ otherwise.",
+		Return: "fixnum|nil",
+	}
 }
 
 type schemaRepetitionCaller bool
@@ -282,11 +291,12 @@ func (caller schemaRepetitionCaller) Call(s *slip.Scope, args slip.List, _ int) 
 	return
 }
 
-func (caller schemaRepetitionCaller) Docs() string {
-	return `__:repetition__ => _keyword_
-
-Returns the repetition type of the schema node which can be :required, :optional, or :repeated.
-`
+func (caller schemaRepetitionCaller) FuncDocs() *slip.FuncDoc {
+	return &slip.FuncDoc{
+		Name:   ":repetition",
+		Text:   "Returns the repetition type of the schema node which can be :required, :optional, or :repeated.",
+		Return: "keyword",
+	}
 }
 
 type schemaWriteCaller bool
@@ -294,7 +304,7 @@ type schemaWriteCaller bool
 func (caller schemaWriteCaller) Call(s *slip.Scope, args slip.List, _ int) (result slip.Object) {
 	obj := s.Get("self").(*flavors.Instance)
 	if len(args) != 1 {
-		flavors.PanicMethodArgChoice(obj, "destination", len(args), "1")
+		slip.PanicMethodArgChoice(obj, "destination", len(args), "1")
 	}
 	if node, ok := obj.Any.(schema.Node); ok {
 		sa := schemaAppender{pad: 2}
@@ -319,13 +329,20 @@ func (caller schemaWriteCaller) Call(s *slip.Scope, args slip.List, _ int) (resu
 	return
 }
 
-func (caller schemaWriteCaller) Docs() string {
-	return `__:write__ _destination_ => _string_|_nil_
-   _destination_ either an _output-stream_, _t_, or _nil_. If an _output-stream_ then
-write to it. If _t_ then write to _*standard-output*_. If _nil_ then return a string.
-
-Writes a line as if it were part of a schema file.
-`
+func (caller schemaWriteCaller) FuncDocs() *slip.FuncDoc {
+	return &slip.FuncDoc{
+		Name: ":write",
+		Text: "Writes a line as if it were part of a schema file.",
+		Args: []*slip.DocArg{
+			{
+				Name: "destination",
+				Type: "output-stream|t|nil",
+				Text: `either an _output-stream_, _t_, or _nil_. If an _output-stream_ then
+write to it. If _t_ then write to _*standard-output*_. If _nil_ then return a string.`,
+			},
+		},
+		Return: "string|nil",
+	}
 }
 
 type schemaParentCaller bool
@@ -340,11 +357,12 @@ func (caller schemaParentCaller) Call(s *slip.Scope, args slip.List, _ int) (res
 	return
 }
 
-func (caller schemaParentCaller) Docs() string {
-	return `__:parent__ => _instance_
-
-Returns the parent of the schema node if it has one.
-`
+func (caller schemaParentCaller) FuncDocs() *slip.FuncDoc {
+	return &slip.FuncDoc{
+		Name:   ":parent",
+		Text:   "Returns the parent of the schema node if it has one.",
+		Return: "instance",
+	}
 }
 
 type schemaFieldsCaller bool
@@ -363,11 +381,12 @@ func (caller schemaFieldsCaller) Call(s *slip.Scope, args slip.List, _ int) (res
 	return
 }
 
-func (caller schemaFieldsCaller) Docs() string {
-	return `__:fields__ => _list_
-
-Returns the fields of the schema node if it is a group node.
-`
+func (caller schemaFieldsCaller) FuncDocs() *slip.FuncDoc {
+	return &slip.FuncDoc{
+		Name:   ":fields",
+		Text:   "Returns the fields of the schema node if it is a group node.",
+		Return: "list",
+	}
 }
 
 type schemaFindCaller bool
@@ -411,14 +430,22 @@ func (caller schemaFindCaller) Call(s *slip.Scope, args slip.List, _ int) (resul
 	return
 }
 
-func (caller schemaFindCaller) Docs() string {
-	return `__:find__ &rest _path_ => _instance_|_nil_
-   _path_ either an _fixnum_, _string_, or a list of _fixnum_ and _strings_ that describe a
-path to a child in the schema.
-
-Finds a field schema in the schema based on the _path_ where a _fixnum_ indicates the index
-of the child field and a _string_ inicates the name of a child field.
-`
+func (caller schemaFindCaller) FuncDocs() *slip.FuncDoc {
+	return &slip.FuncDoc{
+		Name: ":find",
+		Text: `Finds a field schema in the schema based on the _path_ where a _fixnum_ indicates the index
+of the child field and a _string_ inicates the name of a child field.`,
+		Args: []*slip.DocArg{
+			{Name: "&rest"},
+			{
+				Name: "path",
+				Type: "fixnum|string|list",
+				Text: `Either a _fixnum_, _string_, or a list of _fixnum_ and _strings_ that describe a
+path to a child in the schema.`,
+			},
+		},
+		Return: "instance|nil",
+	}
 }
 
 func makeSchemaInstance(node schema.Node) (inst *flavors.Instance) {
