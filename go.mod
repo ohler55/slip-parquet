@@ -4,8 +4,8 @@ go 1.24
 
 require (
 	github.com/apache/arrow/go/v15 v15.0.2
-	github.com/ohler55/ojg v1.26.4
-	github.com/ohler55/slip v1.0.1
+	github.com/ohler55/ojg v1.26.8
+	github.com/ohler55/slip v1.1.0
 	golang.org/x/text v0.19.0
 )
 
