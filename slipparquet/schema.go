@@ -294,7 +294,7 @@ type schemaWriteCaller bool
 func (caller schemaWriteCaller) Call(s *slip.Scope, args slip.List, _ int) (result slip.Object) {
 	obj := s.Get("self").(*flavors.Instance)
 	if len(args) != 1 {
-		flavors.PanicMethodArgChoice(obj, "destination", len(args), "1")
+		slip.PanicMethodArgChoice(obj, "destination", len(args), "1")
 	}
 	if node, ok := obj.Any.(schema.Node); ok {
 		sa := schemaAppender{pad: 2}

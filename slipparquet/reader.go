@@ -219,7 +219,7 @@ type readerColumnCaller bool
 func (caller readerColumnCaller) Call(s *slip.Scope, args slip.List, _ int) (result slip.Object) {
 	obj := s.Get("self").(*flavors.Instance)
 	if len(args) != 1 {
-		flavors.PanicMethodArgChoice(obj, ":column", len(args), "1")
+		slip.PanicMethodArgChoice(obj, ":column", len(args), "1")
 	}
 	if fr, ok := obj.Any.(*pqarrow.FileReader); ok {
 		schem, err := fr.Schema()
