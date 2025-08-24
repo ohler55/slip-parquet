@@ -44,7 +44,7 @@ type Open struct {
 
 // Call the function with the arguments provided.
 func (f *Open) Call(s *slip.Scope, args slip.List, depth int) slip.Object {
-	slip.ArgCountCheck(f, args, 1, 1)
+	slip.CheckArgCount(s, depth, f, args, 1, 1)
 	path, ok := args[0].(slip.String)
 	if !ok {
 		slip.TypePanic(s, depth, "file", args[0], "string")

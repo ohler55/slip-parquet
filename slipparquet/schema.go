@@ -78,7 +78,7 @@ type Schema struct {
 
 // Call the function with the arguments provided.
 func (f *Schema) Call(s *slip.Scope, args slip.List, depth int) slip.Object {
-	slip.ArgCountCheck(f, args, 1, 1)
+	slip.CheckArgCount(s, depth, f, args, 1, 1)
 	inst, ok := args[0].(*flavors.Instance)
 	if !ok {
 		slip.TypePanic(s, depth, "reader", args[0], "parquet-reader-flavor instance")
