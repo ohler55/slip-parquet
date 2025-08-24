@@ -238,11 +238,11 @@ func TestReaderColumnsNestedStruct(t *testing.T) {
 			// Order is arbitrary since a map is created first so convert
 			// back to a map and use pretty.SEN to sort the output.
 			tt.Equal(t, "[{count: 495 max: 742 mean: 416 min: 115 sum: 206195 variance: 10374}]",
-				pretty.SEN(bag.ObjectToBag(vlist[1]), 100.3))
+				pretty.SEN(bag.ObjectToBag(scope, vlist[1], 0), 100.3))
 			tt.Equal(t, "[{count: 495 max: 0 mean: 0 min: 0 sum: 0 variance: 0}]",
-				pretty.SEN(bag.ObjectToBag(vlist[20]), 100.3))
+				pretty.SEN(bag.ObjectToBag(scope, vlist[20], 0), 100.3))
 			tt.Equal(t, "[{count: 81 max: 100 mean: 1.2345679012345678 min: 0 sum: 100 variance: 123.45679012345684}]",
-				pretty.SEN(bag.ObjectToBag(vlist[26]), 100.3))
+				pretty.SEN(bag.ObjectToBag(scope, vlist[26], 0), 100.3))
 		},
 	}).Test(t)
 }

@@ -51,7 +51,7 @@ access the content of that file.`),
 
 type readerInitCaller bool
 
-func (caller readerInitCaller) Call(s *slip.Scope, args slip.List, _ int) slip.Object {
+func (caller readerInitCaller) Call(s *slip.Scope, args slip.List, depth int) slip.Object {
 	obj := s.Get("self").(*flavors.Instance)
 	if 0 < len(args) {
 		args = args[0].(slip.List)
@@ -63,7 +63,7 @@ func (caller readerInitCaller) Call(s *slip.Scope, args slip.List, _ int) slip.O
 		if strings.EqualFold(":file", k) {
 			ss, ok := args[i+1].(slip.String)
 			if !ok {
-				slip.PanicType(":file", args[i+1], "string")
+				slip.TypePanic(s, depth, ":file", args[i+1], "string")
 			}
 			path = string(ss)
 		}
@@ -229,17 +229,17 @@ func (caller readerColumnsCaller) FuncDocs() *slip.FuncDoc {
 
 type readerColumnCaller bool
 
-func (caller readerColumnCaller) Call(s *slip.Scope, args slip.List, _ int) (result slip.Object) {
+func (caller readerColumnCaller) Call(s *slip.Scope, args slip.List, depth int) (result slip.Object) {
 	obj := s.Get("self").(*flavors.Instance)
 	if len(args) != 1 {
-		slip.PanicMethodArgChoice(obj, ":column", len(args), "1")
+		slip.MethodArgChoicePanic(s, depth, obj, ":column", len(args), "1")
 	}
 	if fr, ok := obj.Any.(*pqarrow.FileReader); ok {
 		schem, err := fr.Schema()
 		if err != nil {
 			panic(err)
 		}
-		if cr, _ := findColReader(fr, schem, args[0]); cr != nil {
+		if cr, _ := findColReader(s, fr, schem, args[0], depth); cr != nil {
 			result = readColumn(cr)
 		}
 	}
@@ -261,7 +261,7 @@ func (caller readerColumnCaller) FuncDocs() *slip.FuncDoc {
 	}
 }
 
-func (caller readerRowsCaller) Call(s *slip.Scope, args slip.List, _ int) (result slip.Object) {
+func (caller readerRowsCaller) Call(s *slip.Scope, args slip.List, depth int) (result slip.Object) {
 	obj := s.Get("self").(*flavors.Instance)
 	if fr, ok := obj.Any.(*pqarrow.FileReader); ok {
 		rowCnt := fr.ParquetReader().NumRows()
@@ -270,7 +270,7 @@ func (caller readerRowsCaller) Call(s *slip.Scope, args slip.List, _ int) (resul
 		if 1 < len(args) {
 			ids = args[1]
 		}
-		rr := newRowReader(fr, ids, args[0])
+		rr := newRowReader(s, fr, ids, args[0], depth)
 		for {
 			row := rr.next()
 			if row == nil {
@@ -317,7 +317,7 @@ func (caller readerEachRowCaller) Call(s *slip.Scope, args slip.List, depth int)
 		if 2 < len(args) {
 			ids = args[2]
 		}
-		rr := newRowReader(fr, ids, args[1])
+		rr := newRowReader(s, fr, ids, args[1], depth)
 		for {
 			row := rr.next()
 			if row == nil {

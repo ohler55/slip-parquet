@@ -67,7 +67,7 @@ begin:
 	return
 }
 
-func newRowReader(fr *pqarrow.FileReader, ids, format slip.Object) *rowReader {
+func newRowReader(s *slip.Scope, fr *pqarrow.FileReader, ids, format slip.Object, depth int) *rowReader {
 	rr := rowReader{}
 	switch format {
 	case slip.Symbol(":list"):
@@ -75,7 +75,7 @@ func newRowReader(fr *pqarrow.FileReader, ids, format slip.Object) *rowReader {
 	case slip.Symbol(":assoc"):
 		rr.format = assocRow
 	default:
-		slip.PanicType("format", format, ":list", ":assoc")
+		slip.TypePanic(s, depth, "format", format, ":list", ":assoc")
 	}
 	schem, err := fr.Schema()
 	if err != nil {
@@ -89,14 +89,14 @@ func newRowReader(fr *pqarrow.FileReader, ids, format slip.Object) *rowReader {
 		}
 	case slip.List:
 		for _, id := range tids {
-			cr, key := findColReader(fr, schem, id)
+			cr, key := findColReader(s, fr, schem, id, depth)
 			if cr == nil {
-				slip.NewPanic("column %s not found", id)
+				slip.ErrorPanic(s, depth, "column %s not found", id)
 			}
 			rr.cra = append(rr.cra, &keyColReader{cr: cr, key: key, format: rr.format})
 		}
 	default:
-		slip.PanicType("column-ids", ids, "list", "nil")
+		slip.TypePanic(s, depth, "column-ids", ids, "list", "nil")
 	}
 	return &rr
 }
@@ -128,10 +128,11 @@ func (rr *rowReader) next() (row slip.Object) {
 }
 
 func findColReader(
+	s *slip.Scope,
 	fr *pqarrow.FileReader,
 	schem *arrow.Schema,
 	id slip.Object,
-) (cr *pqarrow.ColumnReader, name string) {
+	depth int) (cr *pqarrow.ColumnReader, name string) {
 	switch tid := id.(type) {
 	case slip.Fixnum:
 		if 0 <= tid && int(tid) < schem.NumFields() {
@@ -149,7 +150,7 @@ func findColReader(
 			name = string(tid)
 		}
 	default:
-		slip.PanicType("id", tid, "fixnum", "string", "symbol")
+		slip.TypePanic(s, depth, "id", tid, "fixnum", "string", "symbol")
 	}
 	return
 }

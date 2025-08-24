@@ -81,11 +81,11 @@ func (f *Schema) Call(s *slip.Scope, args slip.List, depth int) slip.Object {
 	slip.ArgCountCheck(f, args, 1, 1)
 	inst, ok := args[0].(*flavors.Instance)
 	if !ok {
-		slip.PanicType("reader", args[0], "parquet-reader-flavor instance")
+		slip.TypePanic(s, depth, "reader", args[0], "parquet-reader-flavor instance")
 	}
 	var fr *pqarrow.FileReader
 	if fr, ok = inst.Any.(*pqarrow.FileReader); !ok {
-		slip.PanicType("reader", args[0], "parquet-reader-flavor instance")
+		slip.TypePanic(s, depth, "reader", args[0], "parquet-reader-flavor instance")
 	}
 	return makeSchemaInstance(fr.ParquetReader().MetaData().Schema.Root())
 }
@@ -301,10 +301,10 @@ func (caller schemaRepetitionCaller) FuncDocs() *slip.FuncDoc {
 
 type schemaWriteCaller bool
 
-func (caller schemaWriteCaller) Call(s *slip.Scope, args slip.List, _ int) (result slip.Object) {
+func (caller schemaWriteCaller) Call(s *slip.Scope, args slip.List, depth int) (result slip.Object) {
 	obj := s.Get("self").(*flavors.Instance)
 	if len(args) != 1 {
-		slip.PanicMethodArgChoice(obj, "destination", len(args), "1")
+		slip.MethodArgChoicePanic(s, depth, obj, "destination", len(args), "1")
 	}
 	if node, ok := obj.Any.(schema.Node); ok {
 		sa := schemaAppender{pad: 2}
@@ -322,7 +322,7 @@ func (caller schemaWriteCaller) Call(s *slip.Scope, args slip.List, _ int) (resu
 					panic(err)
 				}
 			} else {
-				slip.PanicType("destination", ta, "nil", "t", "output-stream")
+				slip.TypePanic(s, depth, "destination", ta, "nil", "t", "output-stream")
 			}
 		}
 	}
@@ -391,7 +391,7 @@ func (caller schemaFieldsCaller) FuncDocs() *slip.FuncDoc {
 
 type schemaFindCaller bool
 
-func (caller schemaFindCaller) Call(s *slip.Scope, args slip.List, _ int) (result slip.Object) {
+func (caller schemaFindCaller) Call(s *slip.Scope, args slip.List, depth int) (result slip.Object) {
 	obj := s.Get("self").(*flavors.Instance)
 	if node, ok := obj.Any.(schema.Node); ok {
 		path, ok := args[0].(slip.List)
@@ -422,7 +422,7 @@ func (caller schemaFindCaller) Call(s *slip.Scope, args slip.List, _ int) (resul
 				}
 				node = gn.Field(i)
 			default:
-				slip.PanicType("path member", tx, "fixnum", "string", "symbol")
+				slip.TypePanic(s, depth, "path member", tx, "fixnum", "string", "symbol")
 			}
 		}
 		result = makeSchemaInstance(node)

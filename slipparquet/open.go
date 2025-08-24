@@ -47,7 +47,7 @@ func (f *Open) Call(s *slip.Scope, args slip.List, depth int) slip.Object {
 	slip.ArgCountCheck(f, args, 1, 1)
 	path, ok := args[0].(slip.String)
 	if !ok {
-		slip.PanicType("file", args[0], "string")
+		slip.TypePanic(s, depth, "file", args[0], "string")
 	}
 	inst := readerFlavor.MakeInstance().(*flavors.Instance)
 	initReader(inst, string(path))

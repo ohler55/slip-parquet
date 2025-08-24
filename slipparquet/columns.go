@@ -48,11 +48,11 @@ func (f *Columns) Call(s *slip.Scope, args slip.List, depth int) slip.Object {
 	slip.ArgCountCheck(f, args, 1, 1)
 	inst, ok := args[0].(*flavors.Instance)
 	if !ok {
-		slip.PanicType("reader", args[0], "parquet-reader-flavor instance")
+		slip.TypePanic(s, depth, "reader", args[0], "parquet-reader-flavor instance")
 	}
 	var fr *pqarrow.FileReader
 	if fr, ok = inst.Any.(*pqarrow.FileReader); !ok {
-		slip.PanicType("reader", args[0], "parquet-reader-flavor instance")
+		slip.TypePanic(s, depth, "reader", args[0], "parquet-reader-flavor instance")
 	}
 	schem, err := fr.Schema()
 	if err != nil {

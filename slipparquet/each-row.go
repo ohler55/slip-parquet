@@ -68,11 +68,11 @@ func (f *EachRow) Call(s *slip.Scope, args slip.List, depth int) slip.Object {
 	slip.ArgCountCheck(f, args, 3, 4)
 	inst, ok := args[0].(*flavors.Instance)
 	if !ok {
-		slip.PanicType("reader", args[0], "parquet-reader-flavor instance")
+		slip.TypePanic(s, depth, "reader", args[0], "parquet-reader-flavor instance")
 	}
 	var fr *pqarrow.FileReader
 	if fr, ok = inst.Any.(*pqarrow.FileReader); !ok {
-		slip.PanicType("reader", args[0], "parquet-reader-flavor instance")
+		slip.TypePanic(s, depth, "reader", args[0], "parquet-reader-flavor instance")
 	}
 	d2 := depth + 1
 	fun := cl.ResolveToCaller(s, args[1], d2)
@@ -80,7 +80,7 @@ func (f *EachRow) Call(s *slip.Scope, args slip.List, depth int) slip.Object {
 	if 3 < len(args) {
 		ids = args[3]
 	}
-	rr := newRowReader(fr, ids, args[2])
+	rr := newRowReader(s, fr, ids, args[2], depth)
 	for {
 		row := rr.next()
 		if row == nil {
