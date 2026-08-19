@@ -23,16 +23,24 @@ func init() {
 				{
 					Name: "file",
 					Type: "string",
-					Text: "The parquet file to read.",
+					Text: "The parquet file to read. Either a local path or an HTTP or HTTPS URL.",
 				},
 			},
 			Return: "instance",
 			Text: `__parquet-open__ opens a parquet file and returns a _parquet-reader-flavor_ instance.
 
+If the _file_ begins with _http://_ or _https://_ the file is read remotely using range
+requests. Only the parts of the file actually used are fetched so a large remote file can be
+examined without downloading all of it. The server must support range requests.
+
+When reading from _huggingface.co_ the _HF_TOKEN_ environment variable, if set, is used to
+authorize the request. The token is never sent to any other host.
+
 This is the same as the calling _make-instance_ of the _parquet-reader-flavor_ with the _:file_ init
 option of _:file_ except that none of the _:init_ daemons are called.`,
 			Examples: []string{
 				`(parquet-open "sample.parquet") => #<parquet-reader-flavor 1234>`,
+				`(parquet-open "https://huggingface.co/api/datasets/stanfordnlp/imdb/parquet/plain_text/train/0.parquet")`,
 			},
 		}, &Pkg)
 }
@@ -50,19 +58,32 @@ func (f *Open) Call(s *slip.Scope, args slip.List, depth int) slip.Object {
 		slip.TypePanic(s, depth, "file", args[0], "string")
 	}
 	inst := readerFlavor.MakeInstance().(*flavors.Instance)
-	initReader(inst, string(path))
+	initReader(s, inst, string(path), depth)
 
 	return inst
 }
 
-func initReader(inst *flavors.Instance, path string) {
+// initReader opens either a local file or, if the path is an HTTP or HTTPS
+// URL, a remote file read with range requests.
+func initReader(s *slip.Scope, inst *flavors.Instance, path string, depth int) {
+	var (
+		pr  *file.Reader
+		err error
+	)
+	if isURL(path) {
+		var hr *httpReader
+		if hr, err = newHTTPReader(path); err == nil {
+			pr, err = file.NewParquetReader(hr)
+		}
+	} else {
+		pr, err = file.OpenParquetFile(path, true)
+	}
 	var fr *pqarrow.FileReader
-	pr, err := file.OpenParquetFile(path, true)
 	if err == nil {
 		fr, err = pqarrow.NewFileReader(pr, pqarrow.ArrowReadProperties{}, memory.DefaultAllocator)
 	}
 	if err != nil {
-		panic(err)
+		slip.FilePanic(s, depth, slip.String(path), "%s", err)
 	}
 	inst.Any = fr
 	inst.Let(slip.Symbol("filepath"), slip.String(path))

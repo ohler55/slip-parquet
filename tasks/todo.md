@@ -72,13 +72,22 @@ diffing every value against the same file read from disk, and a check that
 reading metadata alone fetches under half the file. Live test against imdb
 behind `-tags hflive` passes (25000 rows, 25 row groups).
 
-### 2. Wire remote into `parquet-open`
+### 2. Wire remote into `parquet-open` — DONE
 Split `initReader` into local and remote paths on URL prefix. Ensure
 `:close` releases the HTTP reader (implement `io.Closer`).
 
-*Verify:* `(parquet-open "https://.../0.parquet")` then `:row-count` returns
-25000; `:schema` returns `text`/`label`; `:close` is clean. Local file tests
-still pass unchanged.
+*Verified:* 11 SLIP-level tests in `open_remote_test.go`. `:row-count`,
+`:column-count`, `:created-by`, `:version`, `:column` and `:rows` all return
+byte-identical results from a served fixture and the same file on disk.
+`make-instance :file <url>` works, `:filepath` holds the URL, double close is
+safe. Errors (404, no range support, unreachable, non-parquet body, missing
+local file) all raise `file-error`. Live test confirms 25000 rows, 2 columns
+and fields `("text" "label")` from imdb.
+
+Note: `initReader` now takes scope and depth and raises `slip.FilePanic`
+instead of a raw `panic(err)`, so a missing *local* file also became a
+`file-error`. No arrow change was needed for close: `file.Reader.Close` calls
+`Close` on the source when it implements `io.Closer`.
 
 ### 3. Row-group access
 `:row-group-count` -> fixnum. `:row-group-info n` -> assoc list of rows,

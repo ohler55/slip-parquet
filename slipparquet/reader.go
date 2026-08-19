@@ -29,7 +29,9 @@ func defReaderFlavor() {
 			slip.List{
 				slip.Symbol(":documentation"),
 				slip.String(`A parquet reader opens a parquet file and can be used to
-access the content of that file.`),
+access the content of that file. The file can be a local file or a remote file
+identified by an HTTP or HTTPS URL. The _filepath_ instance variable holds
+whichever was used to open the reader.`),
 			},
 		},
 		&Pkg,
@@ -68,7 +70,7 @@ func (caller readerInitCaller) Call(s *slip.Scope, args slip.List, depth int) sl
 			path = string(ss)
 		}
 	}
-	initReader(obj, path)
+	initReader(s, obj, path, depth)
 
 	return nil
 }
@@ -82,7 +84,8 @@ func (caller readerInitCaller) FuncDocs() *slip.FuncDoc {
 			{
 				Name: ":file",
 				Type: "string",
-				Text: "The path to a parquet file.",
+				Text: `The path to a parquet file or an HTTP or HTTPS URL of a remote
+parquet file. Remote files are read with range requests so only the parts used are fetched.`,
 			},
 		},
 	}
