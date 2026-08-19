@@ -4,8 +4,8 @@
 materializing the whole file, and get back values that faithfully represent
 what is stored (nulls, bytes, class labels).
 
-**Scope:** Tier 1 (remote + paging + row groups) and Tier 2 (nulls, key-value
-metadata, octets, statistics) from the gap analysis. Writer support and
+**Scope:** Tier 1 (remote + paging + row groups) **complete** and Tier 2
+(nulls, key-value metadata, octets, statistics) from the gap analysis. Writer support and
 multi-shard datasets are explicitly out of scope.
 
 **Branch:** `feat/hf-browsing` off `develop` (after `chore/update-arrow` lands).
@@ -99,16 +99,28 @@ asserts the per-group row counts sum to `:row-count` across three fixtures,
 which is the invariant paging depends on. Out-of-range and non-fixnum indexes
 raise. Live: imdb reports 25 groups, group 0 has 1000 rows.
 
-### 4. Paging and early exit
-Add `:offset` / `:limit` to `:rows` and `:each-row` (and their function forms).
-Use row-group metadata to skip whole groups below the offset rather than
-decoding and discarding. Honour a non-nil callback return from `:each-row` as
-"stop".
+### 4. Paging and early exit — DONE
+`:offset` / `:limit` added to `:rows`, `:each-row` and both function forms as
+`&key` arguments. `rowGroupsFor` picks only the row groups covering the
+requested range, so groups below the offset and above the limit are never read.
+Rows to drop inside the first selected group are skipped with `NextBatch`
+rather than converted to lisp objects. With no offset and no limit the old
+whole-file `GetColumn` path is used unchanged.
 
-*Verify:* offset/limit slices match the equivalent full-read slice; reading
-`:limit 10` from imdb issues no more range requests than reading row group 0
-alone (assert via a counting reader); `:each-row` returning non-nil stops early
-and still closes.
+**Deviation:** the plan said to treat a non-nil callback return from
+`:each-row` as "stop". That was dropped — a callback ending in `print` or
+`setq` returns non-nil and would silently stop after one row. `block` /
+`return-from` already unwinds cleanly out of the Go loop, and the reader
+belongs to the caller so nothing leaks. Tested and documented instead.
+
+*Verified:* 13 tests. `TestRowsPagingMatchesFullRead` cross-checks all 289
+offset/limit combinations from 0..16 against `subseq` of a full read. New
+fixture `testdata/multi-group.parquet` (15 rows in 3 groups of 5) makes group
+skipping observable. `TestPagingRemoteFetchesLess` shows `:limit 1` transfers
+188 bytes where a full read takes 564. `TestEachRowEarlyExit` confirms
+`return-from` stops the walk and leaves the reader usable. Live: 5 rows at
+offset 10000 of the 21MB imdb file, and rows 12498-12501 return
+`((0) (0) (1) (1))` — the exact neg/pos boundary of the split.
 
 ### 5. Null handling
 `IsNull(i)` guard at the top of `ArrayValue`. New fixture with nulls in int64,

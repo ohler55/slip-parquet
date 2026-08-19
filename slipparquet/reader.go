@@ -297,7 +297,7 @@ func (caller readerColumnCaller) Call(s *slip.Scope, args slip.List, depth int) 
 		if err != nil {
 			panic(err)
 		}
-		if cr, _ := findColReader(s, fr, schem, args[0], depth); cr != nil {
+		if cr, _ := findColReader(s, fr, schem, args[0], nil, depth); cr != nil {
 			result = readColumn(cr)
 		}
 	}
@@ -322,13 +322,9 @@ func (caller readerColumnCaller) FuncDocs() *slip.FuncDoc {
 func (caller readerRowsCaller) Call(s *slip.Scope, args slip.List, depth int) (result slip.Object) {
 	obj := s.Get("self").(*flavors.Instance)
 	if fr, ok := obj.Any.(*pqarrow.FileReader); ok {
-		rowCnt := fr.ParquetReader().NumRows()
-		rows := make(slip.List, 0, rowCnt)
-		var ids slip.Object
-		if 1 < len(args) {
-			ids = args[1]
-		}
-		rr := newRowReader(s, fr, ids, args[0], depth)
+		ids, offset, limit := parseRowOpts(s, args[1:], depth)
+		rows := make(slip.List, 0, rowCap(fr, limit))
+		rr := newRowReader(s, fr, ids, args[0], offset, limit, depth)
 		for {
 			row := rr.next()
 			if row == nil {
@@ -359,6 +355,20 @@ element in an assoc list for each key value pair.`,
 				Type: "list",
 				Text: "A list of the column indexes or names for the columns to get values from.",
 			},
+			{Name: "&key"},
+			{
+				Name: ":offset",
+				Type: "fixnum",
+				Text: "The number of rows to skip. The default is 0.",
+			},
+			{
+				Name: ":limit",
+				Type: "fixnum",
+				Text: `The maximum number of rows. The default is all of them.
+
+Only the row groups holding the requested rows are read so paging through a large
+or remote file does not read the whole file.`,
+			},
 		},
 		Return: "list",
 	}
@@ -371,11 +381,8 @@ func (caller readerEachRowCaller) Call(s *slip.Scope, args slip.List, depth int)
 	d2 := depth + 1
 	fun := cl.ResolveToCaller(s, args[0], d2)
 	if fr, ok := obj.Any.(*pqarrow.FileReader); ok {
-		var ids slip.Object
-		if 2 < len(args) {
-			ids = args[2]
-		}
-		rr := newRowReader(s, fr, ids, args[1], depth)
+		ids, offset, limit := parseRowOpts(s, args[2:], depth)
+		rr := newRowReader(s, fr, ids, args[1], offset, limit, depth)
 		for {
 			row := rr.next()
 			if row == nil {
@@ -390,7 +397,10 @@ func (caller readerEachRowCaller) Call(s *slip.Scope, args slip.List, depth int)
 func (caller readerEachRowCaller) FuncDocs() *slip.FuncDoc {
 	return &slip.FuncDoc{
 		Name: ":each-row",
-		Text: "Calls the _function_ on each row.",
+		Text: `Calls the _function_ on each row.
+
+To stop before the last row use a _block_ and _return-from_ in the _function_. The reader
+is not closed by leaving early so it can still be used afterwards.`,
 		Args: []*slip.DocArg{
 			{
 				Name: "function",
@@ -409,6 +419,20 @@ element in an assoc list for each key value pair.`,
 				Name: "column-ids",
 				Type: "list",
 				Text: "A list of the column indexes or names for the columns to get values from.",
+			},
+			{Name: "&key"},
+			{
+				Name: ":offset",
+				Type: "fixnum",
+				Text: "The number of rows to skip. The default is 0.",
+			},
+			{
+				Name: ":limit",
+				Type: "fixnum",
+				Text: `The maximum number of rows. The default is all of them.
+
+Only the row groups holding the requested rows are read so paging through a large
+or remote file does not read the whole file.`,
 			},
 		},
 		Return: "list",

@@ -74,3 +74,23 @@ func TestLiveHuggingFaceFromSlip(t *testing.T) {
 		Expect: "1000",
 	}).Test(t)
 }
+
+// Paging deep into a 21MB remote file must not read the whole thing.
+func TestLiveHuggingFacePaging(t *testing.T) {
+	scope := slip.NewScope()
+	scope.Let("reader", nil)
+	_ = slip.ReadString(fmt.Sprintf(`(setq reader (parquet-open "%s"))`, imdbURL), scope).Eval(scope, nil)
+	defer func() { _ = slip.ReadString(`(send reader :close)`, scope).Eval(scope, nil) }()
+
+	(&sliptest.Function{
+		Scope:  scope,
+		Source: `(length (send reader :rows :list '("label") :offset 10000 :limit 5))`,
+		Expect: "5",
+	}).Test(t)
+	// Row 12500 is where the imdb train split flips from neg to pos.
+	(&sliptest.Function{
+		Scope:  scope,
+		Source: `(send reader :rows :list '("label") :offset 12498 :limit 4)`,
+		Expect: `((0) (0) (1) (1))`,
+	}).Test(t)
+}

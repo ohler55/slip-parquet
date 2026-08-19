@@ -61,7 +61,7 @@ func (f *Column) Call(s *slip.Scope, args slip.List, depth int) (result slip.Obj
 	if err != nil {
 		panic(err)
 	}
-	if cr, _ := findColReader(s, fr, schem, args[1], depth); cr != nil {
+	if cr, _ := findColReader(s, fr, schem, args[1], nil, depth); cr != nil {
 		result = readColumn(cr)
 	}
 	return
