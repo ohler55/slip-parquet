@@ -122,13 +122,34 @@ skipping observable. `TestPagingRemoteFetchesLess` shows `:limit 1` transfers
 offset 10000 of the 21MB imdb file, and rows 12498-12501 return
 `((0) (0) (1) (1))` — the exact neg/pos boundary of the split.
 
-### 5. Null handling
+### 5. Null handling — DONE
 `IsNull(i)` guard at the top of `ArrayValue`. New fixture with nulls in int64,
 double, string, bool, and list columns — none of the seven current fixtures has
 a single null, which is why this went unnoticed.
 
-*Verify:* `[7, 0, NULL]` -> `7, 0, nil` (today it is `7, 0, 0`);
-`["a", NULL]` -> `"a", nil` (today `"a", ""`). Regression test per type.
+*Verified:* new fixture `testdata/nulls.parquet` holds 8 columns each with a
+value, a null, and the natural zero value, so null and zero can be told apart.
+11 SLIP level tests cover `:rows`, `:column`, `:each-row`, `:assoc` and paging.
+
+Measured before and after on the fixture:
+
+| column | before | after |
+|---|---|---|
+| i64 | `(7) (0) (0)` | `(7) (nil) (0)` |
+| f64 | `(1.5) (0) (0)` | `(1.5) (nil) (0)` |
+| str | `("a") ("") ("")` | `("a") (nil) ("")` |
+| date | `(...) (@1970-01-01) (@1970-01-01)` | `(...) (nil) (@1970-01-01)` |
+
+The date case was the worst of them: a null produced a real date that was
+never in the file.
+
+**Existing tests had encoded the bug.** All 17 `ArrayValue` tests in
+`arrayvalue_test.go` appended a null and asserted it read back as the zero
+value. Those assertions were corrected to `nil`. Booleans already expected
+`nil` since lisp `nil` is false, so nothing changed there.
+
+Decision 6 stands: a null boolean and a false boolean both read as `nil` and
+that is inherent to lisp rather than something this package can fix.
 
 ### 6. Key-value metadata
 `:metadata` -> assoc list from `MetaData().KeyValueMetadata()`.

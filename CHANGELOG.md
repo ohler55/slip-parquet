@@ -21,6 +21,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Opening a file that can not be read now raises a _file-error_ instead of a raw error. This
   applies to local files as well as remote ones.
 
+### Fixed
+- A null column value is now _nil_ instead of the zero value of the column type. Previously a
+  null integer was indistinguishable from a 0, a null string from an empty string, and a null
+  date read as the epoch which is a date that was never in the file.
+
 ## [1.2.0] - 2025-09-06
 ### Changed
 - Updated to v1.2.0 of slip.

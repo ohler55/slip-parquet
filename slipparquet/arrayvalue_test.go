@@ -28,7 +28,7 @@ func TestArrayValueBoolean(t *testing.T) {
 	aa := b.NewBooleanArray()
 	tt.Equal(t, slip.True, slipparquet.ArrayValue(aa, 0))
 	tt.Equal(t, nil, slipparquet.ArrayValue(aa, 1))
-	tt.Equal(t, nil, slipparquet.ArrayValue(aa, 2))
+	tt.Equal(t, nil, slipparquet.ArrayValue(aa, 2)) // null
 }
 
 func TestArrayValueInt8(t *testing.T) {
@@ -38,7 +38,7 @@ func TestArrayValueInt8(t *testing.T) {
 	aa := b.NewInt8Array()
 	tt.Equal(t, slip.Fixnum(1), slipparquet.ArrayValue(aa, 0))
 	tt.Equal(t, slip.Fixnum(2), slipparquet.ArrayValue(aa, 1))
-	tt.Equal(t, slip.Fixnum(0), slipparquet.ArrayValue(aa, 2))
+	tt.Equal(t, nil, slipparquet.ArrayValue(aa, 2)) // null
 }
 
 func TestArrayValueInt16(t *testing.T) {
@@ -48,7 +48,7 @@ func TestArrayValueInt16(t *testing.T) {
 	aa := b.NewInt16Array()
 	tt.Equal(t, slip.Fixnum(1), slipparquet.ArrayValue(aa, 0))
 	tt.Equal(t, slip.Fixnum(2), slipparquet.ArrayValue(aa, 1))
-	tt.Equal(t, slip.Fixnum(0), slipparquet.ArrayValue(aa, 2))
+	tt.Equal(t, nil, slipparquet.ArrayValue(aa, 2)) // null
 }
 
 func TestArrayValueInt32(t *testing.T) {
@@ -58,7 +58,7 @@ func TestArrayValueInt32(t *testing.T) {
 	aa := b.NewInt32Array()
 	tt.Equal(t, slip.Fixnum(1), slipparquet.ArrayValue(aa, 0))
 	tt.Equal(t, slip.Fixnum(2), slipparquet.ArrayValue(aa, 1))
-	tt.Equal(t, slip.Fixnum(0), slipparquet.ArrayValue(aa, 2))
+	tt.Equal(t, nil, slipparquet.ArrayValue(aa, 2)) // null
 }
 
 func TestArrayValueInt64(t *testing.T) {
@@ -68,7 +68,7 @@ func TestArrayValueInt64(t *testing.T) {
 	aa := b.NewInt64Array()
 	tt.Equal(t, slip.Fixnum(1), slipparquet.ArrayValue(aa, 0))
 	tt.Equal(t, slip.Fixnum(2), slipparquet.ArrayValue(aa, 1))
-	tt.Equal(t, slip.Fixnum(0), slipparquet.ArrayValue(aa, 2))
+	tt.Equal(t, nil, slipparquet.ArrayValue(aa, 2)) // null
 }
 
 func TestArrayValueUint8(t *testing.T) {
@@ -78,7 +78,7 @@ func TestArrayValueUint8(t *testing.T) {
 	aa := b.NewUint8Array()
 	tt.Equal(t, slip.Fixnum(1), slipparquet.ArrayValue(aa, 0))
 	tt.Equal(t, slip.Fixnum(2), slipparquet.ArrayValue(aa, 1))
-	tt.Equal(t, slip.Fixnum(0), slipparquet.ArrayValue(aa, 2))
+	tt.Equal(t, nil, slipparquet.ArrayValue(aa, 2)) // null
 }
 
 func TestArrayValueUint16(t *testing.T) {
@@ -88,7 +88,7 @@ func TestArrayValueUint16(t *testing.T) {
 	aa := b.NewUint16Array()
 	tt.Equal(t, slip.Fixnum(1), slipparquet.ArrayValue(aa, 0))
 	tt.Equal(t, slip.Fixnum(2), slipparquet.ArrayValue(aa, 1))
-	tt.Equal(t, slip.Fixnum(0), slipparquet.ArrayValue(aa, 2))
+	tt.Equal(t, nil, slipparquet.ArrayValue(aa, 2)) // null
 }
 
 func TestArrayValueUint32(t *testing.T) {
@@ -98,7 +98,7 @@ func TestArrayValueUint32(t *testing.T) {
 	aa := b.NewUint32Array()
 	tt.Equal(t, slip.Fixnum(1), slipparquet.ArrayValue(aa, 0))
 	tt.Equal(t, slip.Fixnum(2), slipparquet.ArrayValue(aa, 1))
-	tt.Equal(t, slip.Fixnum(0), slipparquet.ArrayValue(aa, 2))
+	tt.Equal(t, nil, slipparquet.ArrayValue(aa, 2)) // null
 }
 
 func TestArrayValueUint64(t *testing.T) {
@@ -108,7 +108,7 @@ func TestArrayValueUint64(t *testing.T) {
 	aa := b.NewUint64Array()
 	tt.Equal(t, slip.Fixnum(1), slipparquet.ArrayValue(aa, 0))
 	tt.Equal(t, slip.Fixnum(2), slipparquet.ArrayValue(aa, 1))
-	tt.Equal(t, slip.Fixnum(0), slipparquet.ArrayValue(aa, 2))
+	tt.Equal(t, nil, slipparquet.ArrayValue(aa, 2)) // null
 }
 
 func TestArrayValueFloat16(t *testing.T) {
@@ -118,7 +118,7 @@ func TestArrayValueFloat16(t *testing.T) {
 	aa := b.NewFloat16Array()
 	tt.Equal(t, slip.SingleFloat(1.5), slipparquet.ArrayValue(aa, 0))
 	tt.Equal(t, slip.SingleFloat(2.5), slipparquet.ArrayValue(aa, 1))
-	tt.Equal(t, slip.SingleFloat(0), slipparquet.ArrayValue(aa, 2))
+	tt.Equal(t, nil, slipparquet.ArrayValue(aa, 2)) // null
 }
 
 func TestArrayValueFloat32(t *testing.T) {
@@ -128,7 +128,7 @@ func TestArrayValueFloat32(t *testing.T) {
 	aa := b.NewFloat32Array()
 	tt.Equal(t, slip.SingleFloat(1.5), slipparquet.ArrayValue(aa, 0))
 	tt.Equal(t, slip.SingleFloat(2.5), slipparquet.ArrayValue(aa, 1))
-	tt.Equal(t, slip.SingleFloat(0), slipparquet.ArrayValue(aa, 2))
+	tt.Equal(t, nil, slipparquet.ArrayValue(aa, 2)) // null
 }
 
 func TestArrayValueFloat64(t *testing.T) {
@@ -138,7 +138,7 @@ func TestArrayValueFloat64(t *testing.T) {
 	aa := b.NewFloat64Array()
 	tt.Equal(t, slip.DoubleFloat(1.5), slipparquet.ArrayValue(aa, 0))
 	tt.Equal(t, slip.DoubleFloat(2.5), slipparquet.ArrayValue(aa, 1))
-	tt.Equal(t, slip.DoubleFloat(0), slipparquet.ArrayValue(aa, 2))
+	tt.Equal(t, nil, slipparquet.ArrayValue(aa, 2)) // null
 }
 
 func TestArrayValueString(t *testing.T) {
@@ -148,7 +148,7 @@ func TestArrayValueString(t *testing.T) {
 	aa := b.NewStringArray()
 	tt.Equal(t, slip.String("one"), slipparquet.ArrayValue(aa, 0))
 	tt.Equal(t, slip.String("two"), slipparquet.ArrayValue(aa, 1))
-	tt.Equal(t, slip.String(""), slipparquet.ArrayValue(aa, 2))
+	tt.Equal(t, nil, slipparquet.ArrayValue(aa, 2)) // null
 }
 
 func TestArrayValueBinary(t *testing.T) {
@@ -158,7 +158,7 @@ func TestArrayValueBinary(t *testing.T) {
 	aa := b.NewBinaryArray()
 	tt.Equal(t, slip.String("one"), slipparquet.ArrayValue(aa, 0))
 	tt.Equal(t, slip.String("two"), slipparquet.ArrayValue(aa, 1))
-	tt.Equal(t, slip.String(""), slipparquet.ArrayValue(aa, 2))
+	tt.Equal(t, nil, slipparquet.ArrayValue(aa, 2)) // null
 }
 
 func TestArrayValueFixedSizeBinary(t *testing.T) {
@@ -168,7 +168,7 @@ func TestArrayValueFixedSizeBinary(t *testing.T) {
 	aa := b.NewFixedSizeBinaryArray()
 	tt.Equal(t, slip.String("one"), slipparquet.ArrayValue(aa, 0))
 	tt.Equal(t, slip.String("two"), slipparquet.ArrayValue(aa, 1))
-	tt.Equal(t, slip.String("\x00\x00\x00"), slipparquet.ArrayValue(aa, 2))
+	tt.Equal(t, nil, slipparquet.ArrayValue(aa, 2)) // null
 }
 
 func TestArrayValueDate32(t *testing.T) {
@@ -178,11 +178,9 @@ func TestArrayValueDate32(t *testing.T) {
 	aa := b.NewDate32Array()
 	today, _ := time.Parse(time.RFC3339, "2023-10-31T00:00:00Z")
 	another, _ := time.Parse(time.RFC3339, "2023-11-11T00:00:00Z")
-	null, _ := time.Parse(time.RFC3339, "1970-01-01T00:00:00Z")
-
 	tt.Equal(t, slip.Time(today), slipparquet.ArrayValue(aa, 0))
 	tt.Equal(t, slip.Time(another), slipparquet.ArrayValue(aa, 1))
-	tt.Equal(t, slip.Time(null), slipparquet.ArrayValue(aa, 2))
+	tt.Equal(t, nil, slipparquet.ArrayValue(aa, 2)) // null
 }
 
 func TestArrayValueDate64(t *testing.T) {
@@ -192,11 +190,9 @@ func TestArrayValueDate64(t *testing.T) {
 	aa := b.NewDate64Array()
 	today, _ := time.Parse(time.RFC3339, "2023-10-31T00:00:00Z")
 	another, _ := time.Parse(time.RFC3339, "2023-11-11T00:00:00Z")
-	null, _ := time.Parse(time.RFC3339, "1970-01-01T00:00:00Z")
-
 	tt.Equal(t, slip.Time(today), slipparquet.ArrayValue(aa, 0))
 	tt.Equal(t, slip.Time(another), slipparquet.ArrayValue(aa, 1))
-	tt.Equal(t, slip.Time(null), slipparquet.ArrayValue(aa, 2))
+	tt.Equal(t, nil, slipparquet.ArrayValue(aa, 2)) // null
 }
 
 func TestArrayValueTime32(t *testing.T) {
@@ -206,10 +202,9 @@ func TestArrayValueTime32(t *testing.T) {
 	aa := b.NewTime32Array()
 	today, _ := time.Parse(time.RFC3339, "2023-10-31T01:02:03Z")
 	another, _ := time.Parse(time.RFC3339, "2023-11-11T04:05:06Z")
-	null, _ := time.Parse(time.RFC3339, "1970-01-01T00:00:00Z")
 	tt.Equal(t, slip.Time(today), slipparquet.ArrayValue(aa, 0))
 	tt.Equal(t, slip.Time(another), slipparquet.ArrayValue(aa, 1))
-	tt.Equal(t, slip.Time(null), slipparquet.ArrayValue(aa, 2))
+	tt.Equal(t, nil, slipparquet.ArrayValue(aa, 2)) // null
 }
 
 func TestArrayValueTime64(t *testing.T) {
@@ -219,10 +214,9 @@ func TestArrayValueTime64(t *testing.T) {
 	aa := b.NewTime64Array()
 	today, _ := time.Parse(time.RFC3339, "2023-10-31T01:02:03Z")
 	another, _ := time.Parse(time.RFC3339, "2023-11-11T04:05:06Z")
-	null, _ := time.Parse(time.RFC3339, "1970-01-01T00:00:00Z")
 	tt.Equal(t, slip.Time(today), slipparquet.ArrayValue(aa, 0))
 	tt.Equal(t, slip.Time(another), slipparquet.ArrayValue(aa, 1))
-	tt.Equal(t, slip.Time(null), slipparquet.ArrayValue(aa, 2))
+	tt.Equal(t, nil, slipparquet.ArrayValue(aa, 2)) // null
 }
 
 func TestArrayValueDuration(t *testing.T) {
@@ -232,5 +226,5 @@ func TestArrayValueDuration(t *testing.T) {
 	aa := b.NewDurationArray()
 	tt.Equal(t, slip.Fixnum(100), slipparquet.ArrayValue(aa, 0))
 	tt.Equal(t, slip.Fixnum(200), slipparquet.ArrayValue(aa, 1))
-	tt.Equal(t, slip.Fixnum(0), slipparquet.ArrayValue(aa, 2))
+	tt.Equal(t, nil, slipparquet.ArrayValue(aa, 2)) // null
 }

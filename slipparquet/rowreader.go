@@ -254,7 +254,14 @@ func findColReader(
 
 // ArrayValue returns a value in an arrow.Array. The validity of the index is
 // checked before making this call.
+//
+// A null is nil. Without that check a null would be indistinguishable from the
+// zero value of the column type, so a null int64 would read as 0 and a null
+// date as the epoch.
 func ArrayValue(aa arrow.Array, i int) (value slip.Object) {
+	if aa.IsNull(i) {
+		return nil
+	}
 	switch tc := aa.(type) {
 	case *array.Null: // type having no physical storage
 		value = JSONToLisp(tc.Value(i))
