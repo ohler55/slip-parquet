@@ -63,4 +63,14 @@ func TestLiveHuggingFaceFromSlip(t *testing.T) {
 		Source: `(mapcar (lambda (f) (send f :name)) (send (send reader :schema) :fields))`,
 		Expect: `("text" "label")`,
 	}).Test(t)
+	(&sliptest.Function{
+		Scope:  scope,
+		Source: `(send reader :row-group-count)`,
+		Expect: "25",
+	}).Test(t)
+	(&sliptest.Function{
+		Scope:  scope,
+		Source: `(cdr (assoc "rows" (send reader :row-group-info 0)))`,
+		Expect: "1000",
+	}).Test(t)
 }

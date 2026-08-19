@@ -46,6 +46,9 @@ whichever was used to open the reader.`),
 	readerFlavor.DefMethod(":columns", "", readerColumnsCaller(true))
 	readerFlavor.DefMethod(":column", "", readerColumnCaller(true))
 
+	readerFlavor.DefMethod(":row-group-count", "", readerRowGroupCountCaller(true))
+	readerFlavor.DefMethod(":row-group-info", "", readerRowGroupInfoCaller(true))
+
 	readerFlavor.DefMethod(":row-count", "", readerRowCountCaller(true))
 	readerFlavor.DefMethod(":rows", "", readerRowsCaller(true))
 	readerFlavor.DefMethod(":each-row", "", readerEachRowCaller(true))
@@ -159,6 +162,58 @@ func (caller readerRowCountCaller) FuncDocs() *slip.FuncDoc {
 		Name:   ":row-count",
 		Text:   "Returns the number of rows in the reader file.",
 		Return: "fixnum",
+	}
+}
+
+type readerRowGroupCountCaller bool
+
+func (caller readerRowGroupCountCaller) Call(s *slip.Scope, args slip.List, _ int) (result slip.Object) {
+	obj := s.Get("self").(*flavors.Instance)
+	if fr, ok := obj.Any.(*pqarrow.FileReader); ok {
+		result = slip.Fixnum(fr.ParquetReader().NumRowGroups())
+	}
+	return
+}
+
+func (caller readerRowGroupCountCaller) FuncDocs() *slip.FuncDoc {
+	return &slip.FuncDoc{
+		Name: ":row-group-count",
+		Text: `Returns the number of row groups in the reader file.
+
+A parquet file is stored as one or more row groups. Row groups are the unit the file is read
+in so they are a convenient way to step through a large file a chunk at a time.`,
+		Return: "fixnum",
+	}
+}
+
+type readerRowGroupInfoCaller bool
+
+func (caller readerRowGroupInfoCaller) Call(s *slip.Scope, args slip.List, depth int) (result slip.Object) {
+	obj := s.Get("self").(*flavors.Instance)
+	if len(args) != 1 {
+		slip.MethodArgChoicePanic(s, depth, obj, ":row-group-info", len(args), "1")
+	}
+	if fr, ok := obj.Any.(*pqarrow.FileReader); ok {
+		result = rowGroupInfo(s, fr, args[0], depth)
+	}
+	return
+}
+
+func (caller readerRowGroupInfoCaller) FuncDocs() *slip.FuncDoc {
+	return &slip.FuncDoc{
+		Name: ":row-group-info",
+		Text: `Returns information about one row group as an assoc list.
+
+The keys are _rows_, _columns_, _byte-size_, and _compressed-size_. Since this comes from the
+file metadata none of the row group data is read.`,
+		Args: []*slip.DocArg{
+			{
+				Name: "index",
+				Type: "fixnum",
+				Text: "The index of the row group.",
+			},
+		},
+		Return: "list",
 	}
 }
 

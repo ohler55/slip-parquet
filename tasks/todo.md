@@ -89,11 +89,15 @@ instead of a raw `panic(err)`, so a missing *local* file also became a
 `file-error`. No arrow change was needed for close: `file.Reader.Close` calls
 `Close` on the source when it implements `io.Closer`.
 
-### 3. Row-group access
+### 3. Row-group access — DONE
 `:row-group-count` -> fixnum. `:row-group-info n` -> assoc list of rows,
 byte size, compressed size. Standalone `parquet-row-group-count`.
 
-*Verify:* imdb reports 25 groups of 1000 rows; local fixtures report 1.
+*Verified:* `parquet-row-group-count` / `:row-group-count` and
+`parquet-row-group-info` / `:row-group-info` added. 6 tests including one that
+asserts the per-group row counts sum to `:row-count` across three fixtures,
+which is the invariant paging depends on. Out-of-range and non-fixnum indexes
+raise. Live: imdb reports 25 groups, group 0 has 1000 rows.
 
 ### 4. Paging and early exit
 Add `:offset` / `:limit` to `:rows` and `:each-row` (and their function forms).
