@@ -151,12 +151,25 @@ value. Those assertions were corrected to `nil`. Booleans already expected
 Decision 6 stands: a null boolean and a false boolean both read as `nil` and
 that is inherent to lisp rather than something this package can fix.
 
-### 6. Key-value metadata
+### 6. Key-value metadata — DONE
 `:metadata` -> assoc list from `MetaData().KeyValueMetadata()`.
 Standalone `parquet-metadata`.
 
-*Verify:* imdb returns keys `huggingface` and `ARROW:schema`, and the
-`huggingface` value parses to the feature spec containing `["neg","pos"]`.
+*Verified:* `parquet-metadata` and `:metadata` return an assoc list, or nil for
+a file with no key-value metadata. 6 tests over fixtures written by three
+different applications, which also settles the question of whether this is a
+HuggingFace specific feature — it is not:
+
+| fixture | keys |
+|---|---|
+| `binary.parquet` | `parquet.proto.descriptor`, `writer.model.name`, `parquet.proto.class` |
+| `nested-maps.parquet`, `nested-list.parquet` | `org.apache.spark.sql.parquet.row.metadata` |
+| `null-list.parquet` | `ARROW:schema` |
+| imdb (live) | `huggingface`, `ARROW:schema` |
+
+Live test confirms the `huggingface` value carries `"names": ["neg", "pos"]`.
+Per settled decision 4 the value is returned as written and parsing is left to
+lisp, so no HuggingFace knowledge is in the Go code.
 
 ### 7. Column statistics
 `:statistics &optional column-id` -> per row-group min/max/null-count/

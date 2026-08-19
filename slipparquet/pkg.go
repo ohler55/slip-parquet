@@ -68,3 +68,24 @@ func rowGroupInfo(s *slip.Scope, fr *pqarrow.FileReader, id slip.Object, depth i
 		slip.List{slip.String("compressed-size"), slip.Tail{Value: slip.Fixnum(rg.TotalCompressedSize())}},
 	}
 }
+
+// fileMetadata returns the parquet file key-value metadata as an assoc list.
+//
+// The metadata is a map of strings that any writer can put in the file footer.
+// Spark stores its SQL schema there, Arrow stores a serialized schema, and
+// HuggingFace stores the dataset feature spec including the class label names.
+func fileMetadata(fr *pqarrow.FileReader) slip.Object {
+	kv := fr.ParquetReader().MetaData().KeyValueMetadata()
+	meta := make(slip.List, 0, kv.Len())
+	for _, key := range kv.Keys() {
+		var val slip.Object
+		if v := kv.FindValue(key); v != nil {
+			val = slip.String(*v)
+		}
+		meta = append(meta, slip.List{slip.String(key), slip.Tail{Value: val}})
+	}
+	if len(meta) == 0 {
+		return nil
+	}
+	return meta
+}

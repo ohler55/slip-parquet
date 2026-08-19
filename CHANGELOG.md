@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `parquet-row-group-info` and the `:row-group-info` method.
 - `:offset` and `:limit` keywords on `parquet-rows`, `parquet-each-row`, `:rows` and `:each-row`.
   Only the row groups holding the requested rows are read.
+- `parquet-metadata` and the `:metadata` method returning the file key-value metadata as an
+  assoc list.
 
 ### Changed
 - Migrated from `github.com/apache/arrow/go/v15` v15.0.2 to `github.com/apache/arrow-go/v18` v18.7.0.

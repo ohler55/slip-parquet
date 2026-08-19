@@ -11,6 +11,7 @@ package slipparquet
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/apache/arrow-go/v18/parquet/file"
@@ -93,4 +94,25 @@ func TestLiveHuggingFacePaging(t *testing.T) {
 		Source: `(send reader :rows :list '("label") :offset 12498 :limit 4)`,
 		Expect: `((0) (0) (1) (1))`,
 	}).Test(t)
+}
+
+// The HuggingFace feature spec rides in the standard parquet key-value
+// metadata. Decoding it is left to lisp which is why the package stays a
+// parquet package rather than a HuggingFace client.
+func TestLiveHuggingFaceMetadata(t *testing.T) {
+	scope := slip.NewScope()
+	scope.Let("reader", nil)
+	_ = slip.ReadString(fmt.Sprintf(`(setq reader (parquet-open "%s"))`, imdbURL), scope).Eval(scope, nil)
+	defer func() { _ = slip.ReadString(`(send reader :close)`, scope).Eval(scope, nil) }()
+
+	(&sliptest.Function{
+		Scope:  scope,
+		Source: `(mapcar 'car (send reader :metadata))`,
+		Expect: `("huggingface" "ARROW:schema")`,
+	}).Test(t)
+	// The class label names are what turn a label of 0 into "neg". The value is
+	// returned as written so parsing it is up to the caller.
+	spec, _ := slip.ReadString(
+		`(cdr (assoc "huggingface" (send reader :metadata)))`, scope).Eval(scope, nil).(slip.String)
+	tt.Equal(t, true, strings.Contains(string(spec), `"names": ["neg", "pos"]`), string(spec))
 }

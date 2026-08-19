@@ -41,6 +41,7 @@ whichever was used to open the reader.`),
 	readerFlavor.DefMethod(":version", "", readerVersionCaller(true))
 	readerFlavor.DefMethod(":created-by", "", readerCreatedByCaller(true))
 	readerFlavor.DefMethod(":schema", "", readerSchemaCaller(true))
+	readerFlavor.DefMethod(":metadata", "", readerMetadataCaller(true))
 
 	readerFlavor.DefMethod(":column-count", "", readerColumnCountCaller(true))
 	readerFlavor.DefMethod(":columns", "", readerColumnsCaller(true))
@@ -162,6 +163,32 @@ func (caller readerRowCountCaller) FuncDocs() *slip.FuncDoc {
 		Name:   ":row-count",
 		Text:   "Returns the number of rows in the reader file.",
 		Return: "fixnum",
+	}
+}
+
+type readerMetadataCaller bool
+
+func (caller readerMetadataCaller) Call(s *slip.Scope, args slip.List, _ int) (result slip.Object) {
+	obj := s.Get("self").(*flavors.Instance)
+	if fr, ok := obj.Any.(*pqarrow.FileReader); ok {
+		result = fileMetadata(fr)
+	}
+	return
+}
+
+func (caller readerMetadataCaller) FuncDocs() *slip.FuncDoc {
+	return &slip.FuncDoc{
+		Name: ":metadata",
+		Text: `Returns the file key-value metadata as an assoc list.
+
+Every parquet file can carry a map of strings in its footer. What is in it depends on the
+application that wrote the file. Spark writes its SQL schema under
+_org.apache.spark.sql.parquet.row.metadata_, Arrow writes a serialized schema under
+_ARROW:schema_, and a HuggingFace dataset carries the feature spec under _huggingface_.
+The values are returned as written so a value holding JSON has to be parsed by the caller.
+
+Returns nil when the file has no key-value metadata.`,
+		Return: "list",
 	}
 }
 
