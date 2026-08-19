@@ -221,11 +221,15 @@ instance variable is assigned by the flavor *before* `:init` runs and is
 stripped from the `:init` arguments. `initReader` was overwriting it with nil.
 `:init` now reads the instance variable back to validate it.
 
-### 9. Docs
+### 9. Docs — DONE
 README section on remote/HF usage with a worked example; `:doc` strings for
 every new method; CHANGELOG entry.
 
-*Verify:* `make test` (lint + tests) green; example in README runs as written.
+*Verified:* README gained a Usage section covering rows, paging, early exit,
+remote files, row group info, statistics, metadata, nulls, and `:binary-as`.
+Every documented form is executed by `readme_test.go` against
+`multi-group.parquet` and checked against the exact output printed in the
+README, so the examples cannot drift. `make test` green.
 
 ---
 
