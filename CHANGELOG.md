@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Only the row groups holding the requested rows are read.
 - `parquet-metadata` and the `:metadata` method returning the file key-value metadata as an
   assoc list.
+- `parquet-statistics` and the `:statistics` method returning per row group column statistics
+  of min, max, null count, distinct count, and value count.
 
 ### Changed
 - Migrated from `github.com/apache/arrow/go/v15` v15.0.2 to `github.com/apache/arrow-go/v18` v18.7.0.

@@ -116,3 +116,35 @@ func TestLiveHuggingFaceMetadata(t *testing.T) {
 		`(cdr (assoc "huggingface" (send reader :metadata)))`, scope).Eval(scope, nil).(slip.String)
 	tt.Equal(t, true, strings.Contains(string(spec), `"names": ["neg", "pos"]`), string(spec))
 }
+
+// Statistics come from the footer so browsing a remote file this way reads no
+// column data at all.
+func TestLiveHuggingFaceStatistics(t *testing.T) {
+	scope := slip.NewScope()
+	scope.Let("reader", nil)
+	_ = slip.ReadString(fmt.Sprintf(`(setq reader (parquet-open "%s"))`, imdbURL), scope).Eval(scope, nil)
+	defer func() { _ = slip.ReadString(`(send reader :close)`, scope).Eval(scope, nil) }()
+
+	(&sliptest.Function{
+		Scope:  scope,
+		Source: `(mapcar 'car (send reader :statistics))`,
+		Expect: `("text" "label")`,
+	}).Test(t)
+	(&sliptest.Function{
+		Scope:  scope,
+		Source: `(length (send reader :statistics "label"))`,
+		Expect: "25",
+	}).Test(t)
+	// The first 12 row groups are all label 0, the split is sorted.
+	(&sliptest.Function{
+		Scope:  scope,
+		Source: `(cdr (assoc "max" (car (send reader :statistics "label"))))`,
+		Expect: "0",
+	}).Test(t)
+	// The last row group is all label 1.
+	(&sliptest.Function{
+		Scope:  scope,
+		Source: `(cdr (assoc "min" (car (last (send reader :statistics "label")))))`,
+		Expect: "1",
+	}).Test(t)
+}

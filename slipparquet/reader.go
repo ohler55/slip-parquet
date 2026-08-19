@@ -42,6 +42,7 @@ whichever was used to open the reader.`),
 	readerFlavor.DefMethod(":created-by", "", readerCreatedByCaller(true))
 	readerFlavor.DefMethod(":schema", "", readerSchemaCaller(true))
 	readerFlavor.DefMethod(":metadata", "", readerMetadataCaller(true))
+	readerFlavor.DefMethod(":statistics", "", readerStatisticsCaller(true))
 
 	readerFlavor.DefMethod(":column-count", "", readerColumnCountCaller(true))
 	readerFlavor.DefMethod(":columns", "", readerColumnsCaller(true))

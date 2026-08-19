@@ -171,12 +171,25 @@ Live test confirms the `huggingface` value carries `"names": ["neg", "pos"]`.
 Per settled decision 4 the value is returned as written and parsing is left to
 lisp, so no HuggingFace knowledge is in the Go code.
 
-### 7. Column statistics
+### 7. Column statistics — DONE
 `:statistics &optional column-id` -> per row-group min/max/null-count/
 distinct-count, nil where absent.
 
-*Verify:* imdb row group 0 `text` column reports non-nil min/max;
-`primitive.parquet` reports nil (confirmed to carry no statistics).
+*Verified:* `parquet-statistics` and `:statistics` take an optional column id.
+With one, a list of per row group assoc lists with keys `row-group`,
+`num-values`, `min`, `max`, `null-count`, `distinct-count`. Without one, every
+column keyed by its leaf path. 9 tests.
+
+`multi-group.parquet` reports min/max of 0-4, 5-9, 10-14 across its three row
+groups, which shows the values really are per chunk. `nulls.parquet` reports
+`null-count 1` without reading any data. `primitive.parquet` carries no
+statistics at all so only `row-group` and `num-values` appear — absent
+statistics are a normal case rather than an error.
+
+Columns are identified by leaf path since that is what parquet keys statistics
+by, so `nulls.parquet` exposes `lst.list.element` and `st.a`. Live: imdb has 25
+entries for `label`, first group max 0 and last group min 1, confirming the
+split is sorted.
 
 ### 8. Binary as octets
 Per decision 5. Covers both the top-level `*array.Binary` case and the
