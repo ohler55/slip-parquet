@@ -3,9 +3,7 @@
 package slipparquet
 
 import (
-	"github.com/apache/arrow-go/v18/parquet/pqarrow"
 	"github.com/ohler55/slip"
-	"github.com/ohler55/slip/pkg/flavors"
 )
 
 func init() {
@@ -49,20 +47,13 @@ type Column struct {
 // Call the function with the arguments provided.
 func (f *Column) Call(s *slip.Scope, args slip.List, depth int) (result slip.Object) {
 	slip.CheckArgCount(s, depth, f, args, 2, 2)
-	inst, ok := args[0].(*flavors.Instance)
-	if !ok {
-		slip.TypePanic(s, depth, "reader", args[0], "parquet-reader-flavor instance")
-	}
-	var fr *pqarrow.FileReader
-	if fr, ok = inst.Any.(*pqarrow.FileReader); !ok {
-		slip.TypePanic(s, depth, "reader", args[0], "parquet-reader-flavor instance")
-	}
+	fr, octets := readerOctets(s, args, depth)
 	schem, err := fr.Schema()
 	if err != nil {
 		panic(err)
 	}
 	if cr, _ := findColReader(s, fr, schem, args[1], nil, depth); cr != nil {
-		result = readColumn(cr)
+		result = readColumn(cr, octets)
 	}
 	return
 }

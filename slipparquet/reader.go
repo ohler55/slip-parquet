@@ -18,12 +18,13 @@ var readerFlavor *flavors.Flavor
 
 func defReaderFlavor() {
 	readerFlavor = flavors.DefFlavor("parquet-reader-flavor",
-		map[string]slip.Object{"filepath": nil},
+		map[string]slip.Object{"filepath": nil, "binary-as": nil},
 		nil,
 		slip.List{
 			slip.List{
 				slip.Symbol(":init-keywords"),
 				slip.Symbol(":file"),
+				slip.Symbol(":binary-as"),
 			},
 			slip.Symbol(":gettable-instance-variables"),
 			slip.List{
@@ -31,7 +32,8 @@ func defReaderFlavor() {
 				slip.String(`A parquet reader opens a parquet file and can be used to
 access the content of that file. The file can be a local file or a remote file
 identified by an HTTP or HTTPS URL. The _filepath_ instance variable holds
-whichever was used to open the reader.`),
+whichever was used to open the reader and the _binary-as_ instance variable
+holds how binary column values are represented.`),
 			},
 		},
 		&Pkg,
@@ -63,19 +65,31 @@ func (caller readerInitCaller) Call(s *slip.Scope, args slip.List, depth int) sl
 	if 0 < len(args) {
 		args = args[0].(slip.List)
 	}
-	var path string
+	var (
+		path     string
+		binaryAs slip.Object
+	)
 	for i := 0; i < len(args); i += 2 {
 		key, _ := args[i].(slip.Symbol)
 		k := string(key)
-		if strings.EqualFold(":file", k) {
+		switch {
+		case strings.EqualFold(":file", k):
 			ss, ok := args[i+1].(slip.String)
 			if !ok {
 				slip.TypePanic(s, depth, ":file", args[i+1], "string")
 			}
 			path = string(ss)
+		case strings.EqualFold(":binary-as", k):
+			binaryAs = args[i+1]
 		}
 	}
-	initReader(s, obj, path, depth)
+	// An init keyword that matches an instance variable is assigned by the
+	// flavor before :init runs and does not appear in the arguments, so pick
+	// it up from the instance variable to check it.
+	if binaryAs == nil {
+		binaryAs = obj.Get("binary-as")
+	}
+	initReader(s, obj, path, binaryAsArg(s, binaryAs, depth), depth)
 
 	return nil
 }
@@ -91,6 +105,17 @@ func (caller readerInitCaller) FuncDocs() *slip.FuncDoc {
 				Type: "string",
 				Text: `The path to a parquet file or an HTTP or HTTPS URL of a remote
 parquet file. Remote files are read with range requests so only the parts used are fetched.`,
+			},
+			{
+				Name: ":binary-as",
+				Type: "keyword",
+				Text: `How to represent binary column values. Either _:string_ which is
+the default or _:octets_.
+
+Parquet stores text and raw bytes in the same physical type and only some writers annotate
+which is which. A column that arrives unannotated is a string by default. Pass _:octets_ to get
+the raw bytes instead, which is what is wanted for a column holding an image, audio, or any
+other binary payload.`,
 			},
 		},
 	}
@@ -297,7 +322,7 @@ func (caller readerColumnsCaller) Call(s *slip.Scope, args slip.List, _ int) (re
 		columns := make(slip.List, schem.NumFields())
 		for i := 0; i < schem.NumFields(); i++ {
 			if cr, _ := fr.GetColumn(context.Background(), i); cr != nil {
-				columns[i] = readColumn(cr)
+				columns[i] = readColumn(cr, isOctets(obj))
 			}
 		}
 		result = columns
@@ -326,7 +351,7 @@ func (caller readerColumnCaller) Call(s *slip.Scope, args slip.List, depth int) 
 			panic(err)
 		}
 		if cr, _ := findColReader(s, fr, schem, args[0], nil, depth); cr != nil {
-			result = readColumn(cr)
+			result = readColumn(cr, isOctets(obj))
 		}
 	}
 	return
@@ -352,7 +377,7 @@ func (caller readerRowsCaller) Call(s *slip.Scope, args slip.List, depth int) (r
 	if fr, ok := obj.Any.(*pqarrow.FileReader); ok {
 		ids, offset, limit := parseRowOpts(s, args[1:], depth)
 		rows := make(slip.List, 0, rowCap(fr, limit))
-		rr := newRowReader(s, fr, ids, args[0], offset, limit, depth)
+		rr := newRowReader(s, fr, ids, args[0], offset, limit, isOctets(obj), depth)
 		for {
 			row := rr.next()
 			if row == nil {
@@ -410,7 +435,7 @@ func (caller readerEachRowCaller) Call(s *slip.Scope, args slip.List, depth int)
 	fun := cl.ResolveToCaller(s, args[0], d2)
 	if fr, ok := obj.Any.(*pqarrow.FileReader); ok {
 		ids, offset, limit := parseRowOpts(s, args[2:], depth)
-		rr := newRowReader(s, fr, ids, args[1], offset, limit, depth)
+		rr := newRowReader(s, fr, ids, args[1], offset, limit, isOctets(obj), depth)
 		for {
 			row := rr.next()
 			if row == nil {
@@ -467,7 +492,7 @@ or remote file does not read the whole file.`,
 	}
 }
 
-func readColumn(cr *pqarrow.ColumnReader) (result slip.List) {
+func readColumn(cr *pqarrow.ColumnReader, octets bool) (result slip.List) {
 	for {
 		ac, err := cr.NextBatch(batchSize) // *arrow.Chunked
 		if err != nil {
@@ -479,7 +504,7 @@ func readColumn(cr *pqarrow.ColumnReader) (result slip.List) {
 		for _, chunk := range ac.Chunks() {
 			cnt := chunk.Len()
 			for i := 0; i < cnt; i++ {
-				result = append(result, ArrayValue(chunk, i))
+				result = append(result, arrayValue(chunk, i, octets))
 			}
 		}
 	}

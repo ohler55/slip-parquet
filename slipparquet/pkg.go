@@ -89,3 +89,29 @@ func fileMetadata(fr *pqarrow.FileReader) slip.Object {
 	}
 	return meta
 }
+
+// isOctets reports whether a reader was opened with :binary-as :octets in
+// which case binary column values are octets rather than strings.
+func isOctets(inst *flavors.Instance) bool {
+	return inst != nil && inst.Get("binary-as") == slip.Symbol(":octets")
+}
+
+// readerOctets returns the file reader held by the first argument along with
+// how that reader represents binary values.
+func readerOctets(s *slip.Scope, args slip.List, depth int) (*pqarrow.FileReader, bool) {
+	fr := readerArg(s, args, depth)
+	inst, _ := args[0].(*flavors.Instance)
+
+	return fr, isOctets(inst)
+}
+
+// binaryAsArg checks a :binary-as value and returns it.
+func binaryAsArg(s *slip.Scope, val slip.Object, depth int) slip.Object {
+	switch val {
+	case slip.Symbol(":string"), slip.Symbol(":octets"), nil:
+		return val
+	}
+	slip.TypePanic(s, depth, ":binary-as", val, ":string", ":octets")
+
+	return nil
+}

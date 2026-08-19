@@ -17,6 +17,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   assoc list.
 - `parquet-statistics` and the `:statistics` method returning per row group column statistics
   of min, max, null count, distinct count, and value count.
+- A `:binary-as` option on `parquet-open` and the reader init keywords. It takes _:string_,
+  the default and previous behaviour, or _:octets_ for columns holding image, audio, or other
+  binary payloads. Parquet does not distinguish text from bytes unless the writer annotated
+  the column so the choice belongs to the caller.
+- `ArrayValueOctets` and `JSONToLispOctets` go functions alongside the existing `ArrayValue`
+  and `JSONToLisp` which are unchanged.
 
 ### Changed
 - Migrated from `github.com/apache/arrow/go/v15` v15.0.2 to `github.com/apache/arrow-go/v18` v18.7.0.

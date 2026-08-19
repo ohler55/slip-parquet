@@ -40,7 +40,7 @@ Verified against `stanfordnlp/imdb` before planning:
 4. **No HF-specific decoding in Go.** Expose raw key-value metadata; let SLIP
    code parse the `huggingface` JSON. Keeps the package generic.
 
-### Open — need a call before step 5
+### Resolved during implementation
 
 5. **`array.Binary` -> `slip.Octets` is a behaviour change.** In
    `testdata/primitive.parquet`, `string_col` and `date_string_col` are parquet
@@ -191,14 +191,35 @@ by, so `nulls.parquet` exposes `lst.list.element` and `st.a`. Live: imdb has 25
 entries for `label`, first group max 0 and last group min 1, confirming the
 split is sorted.
 
-### 8. Binary as octets
+### 8. Binary as octets — DONE
 Per decision 5. Covers both the top-level `*array.Binary` case and the
 `[]byte` case in `JSONToLisp` — HF `Image`/`Audio` features are
 `struct<bytes: binary, path: string>` and reach SLIP through the JSON path,
 where raw bytes currently become a `slip.String`
 (confirmed: `{"bytes" . "\x89PNG\r"}`).
 
-*Verify:* PNG magic round-trips byte-for-byte; nested struct case covered.
+*Verified:* **Decision 5 resolved as option (c).** A reader option
+`:binary-as :string|:octets` on `parquet-open` and the `:file` init keywords,
+defaulting to `:string` which is today's behaviour. Parquet cannot tell text
+from bytes for an unannotated `BYTE_ARRAY`, so the file genuinely does not
+carry the answer and the caller has to supply it. Nothing existing changed.
+
+Both paths are covered: the typed `*array.Binary` case and the `[]byte` case in
+`JSONToLisp`, which is how a nested HuggingFace image feature
+(`struct<bytes, path>`) reaches lisp.
+
+Exported API stayed additive: `ArrayValue` and `JSONToLisp` keep their
+signatures and behaviour, with `ArrayValueOctets` and `JSONToLispOctets` added
+alongside. Both delegate to a private implementation.
+
+10 tests. PNG magic round-trips as `slip.Octets{0x89 0x50 0x4e 0x47}` where the
+string form mangles it. A null binary is still nil rather than empty octets.
+Text columns are unaffected.
+
+**Gotcha worth recording:** a flavor init keyword whose name matches an
+instance variable is assigned by the flavor *before* `:init` runs and is
+stripped from the `:init` arguments. `initReader` was overwriting it with nil.
+`:init` now reads the instance variable back to validate it.
 
 ### 9. Docs
 README section on remote/HF usage with a worked example; `:doc` strings for

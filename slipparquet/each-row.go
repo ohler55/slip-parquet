@@ -81,11 +81,11 @@ type EachRow struct {
 // Call the function with the arguments provided.
 func (f *EachRow) Call(s *slip.Scope, args slip.List, depth int) slip.Object {
 	slip.CheckArgCount(s, depth, f, args, 3, 8)
-	fr := readerArg(s, args, depth)
+	fr, octets := readerOctets(s, args, depth)
 	d2 := depth + 1
 	fun := cl.ResolveToCaller(s, args[1], d2)
 	ids, offset, limit := parseRowOpts(s, args[3:], depth)
-	rr := newRowReader(s, fr, ids, args[2], offset, limit, depth)
+	rr := newRowReader(s, fr, ids, args[2], offset, limit, octets, depth)
 	for {
 		row := rr.next()
 		if row == nil {

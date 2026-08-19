@@ -31,6 +31,7 @@ type keyColReader struct {
 	ci     int // chunk index
 	ccnt   int // chunk len
 	format byte
+	octets bool
 }
 
 type rowReader struct {
@@ -55,13 +56,13 @@ begin:
 		kcr.ccnt = kcr.chunks[0].Len()
 	}
 	if kcr.ci < kcr.ccnt {
-		value = ArrayValue(kcr.chunks[0], kcr.ci)
+		value = arrayValue(kcr.chunks[0], kcr.ci, kcr.octets)
 		kcr.ci++
 	} else {
 		kcr.chunks = kcr.chunks[1:]
 		if 0 < len(kcr.chunks) {
 			kcr.ccnt = kcr.chunks[0].Len()
-			value = ArrayValue(kcr.chunks[0], 0)
+			value = arrayValue(kcr.chunks[0], 0, kcr.octets)
 			kcr.ci = 1
 		} else {
 			kcr.ac = nil
@@ -151,6 +152,7 @@ func newRowReader(
 	fr *pqarrow.FileReader,
 	ids, format slip.Object,
 	offset, limit int64,
+	octets bool,
 	depth int) *rowReader {
 	rr := rowReader{limit: limit}
 	switch format {
@@ -170,7 +172,8 @@ func newRowReader(
 	case nil:
 		for i := 0; i < schem.NumFields(); i++ {
 			cr := colReader(fr, i, groups)
-			rr.cra = append(rr.cra, &keyColReader{cr: cr, key: schem.Field(i).Name, format: rr.format})
+			rr.cra = append(rr.cra,
+				&keyColReader{cr: cr, key: schem.Field(i).Name, format: rr.format, octets: octets})
 		}
 	case slip.List:
 		for _, id := range tids {
@@ -178,7 +181,7 @@ func newRowReader(
 			if cr == nil {
 				slip.ErrorPanic(s, depth, "column %s not found", id)
 			}
-			rr.cra = append(rr.cra, &keyColReader{cr: cr, key: key, format: rr.format})
+			rr.cra = append(rr.cra, &keyColReader{cr: cr, key: key, format: rr.format, octets: octets})
 		}
 	default:
 		slip.TypePanic(s, depth, "column-ids", ids, "list", "nil")
@@ -258,13 +261,26 @@ func findColReader(
 // A null is nil. Without that check a null would be indistinguishable from the
 // zero value of the column type, so a null int64 would read as 0 and a null
 // date as the epoch.
-func ArrayValue(aa arrow.Array, i int) (value slip.Object) {
+//
+// Binary values are strings. Use ArrayValueOctets to get them as octets.
+func ArrayValue(aa arrow.Array, i int) slip.Object {
+	return arrayValue(aa, i, false)
+}
+
+// ArrayValueOctets is ArrayValue except that binary values are octets rather
+// than strings. Parquet does not distinguish between text and bytes unless the
+// writer annotated the column so which one is wanted is up to the caller.
+func ArrayValueOctets(aa arrow.Array, i int) slip.Object {
+	return arrayValue(aa, i, true)
+}
+
+func arrayValue(aa arrow.Array, i int, octets bool) (value slip.Object) {
 	if aa.IsNull(i) {
 		return nil
 	}
 	switch tc := aa.(type) {
 	case *array.Null: // type having no physical storage
-		value = JSONToLisp(tc.Value(i))
+		value = jsonToLisp(tc.Value(i), octets)
 	case *array.Boolean: // is a 1 bit, LSB bit-packed ordering
 		if tc.Value(i) {
 			value = slip.True
@@ -294,9 +310,9 @@ func ArrayValue(aa arrow.Array, i int) (value slip.Object) {
 	case *array.String: // a UTF8 variable-length string
 		value = slip.String(tc.Value(i))
 	case *array.Binary: // a Variable-length byte type (no guarantee of UTF8-ness)
-		value = slip.String(tc.Value(i))
+		value = binaryValue(tc.Value(i), octets)
 	case *array.FixedSizeBinary: // a binary where each value occupies the same number of bytes
-		value = slip.String(tc.Value(i))
+		value = binaryValue(tc.Value(i), octets)
 	case *array.Date32: // int32 days since the UNIX epoch
 		value = slip.Time(tc.Value(i).ToTime())
 	case *array.Date64: // int64 milliseconds since the UNIX epoch
@@ -329,14 +345,35 @@ func ArrayValue(aa arrow.Array, i int) (value slip.Object) {
 		// values and parsing. The issue is that the API is based on top level
 		// columns and does not expose which elements in the column match up
 		// with a row.
-		value = JSONToLisp(tc.GetOneForMarshal(i))
+		value = jsonToLisp(tc.GetOneForMarshal(i), octets)
 	}
 	return
 }
 
+// binaryValue returns bytes as either a string or octets.
+func binaryValue(b []byte, octets bool) slip.Object {
+	if octets {
+		return slip.Octets(b)
+	}
+	return slip.String(b)
+}
+
 // JSONToLisp convertes parquet JSON to lisp. It differs from
 // slip.SimpleObject in that []any can also be representations of maps.
-func JSONToLisp(val any) (obj slip.Object) {
+//
+// Binary values are strings. Use JSONToLispOctets to get them as octets.
+func JSONToLisp(val any) slip.Object {
+	return jsonToLisp(val, false)
+}
+
+// JSONToLispOctets is JSONToLisp except that binary values are octets rather
+// than strings. Nested columns such as a HuggingFace image feature carry their
+// bytes through this path.
+func JSONToLispOctets(val any) slip.Object {
+	return jsonToLisp(val, true)
+}
+
+func jsonToLisp(val any, octets bool) (obj slip.Object) {
 	if raw, ok := val.(json.RawMessage); ok {
 		val = oj.MustParse([]byte(raw))
 	}
@@ -377,7 +414,7 @@ func JSONToLisp(val any) (obj slip.Object) {
 	case string:
 		obj = slip.String(tv)
 	case []byte:
-		obj = slip.String(tv)
+		obj = binaryValue(tv, octets)
 
 	case time.Time:
 		obj = slip.Time(tv)
@@ -387,17 +424,20 @@ func JSONToLisp(val any) (obj slip.Object) {
 		for _, v := range tv {
 			if m, ok := v.(map[string]any); ok && len(m) == 2 {
 				if key, has := m["key"]; has {
-					list = append(list, slip.List{JSONToLisp(key), slip.Tail{Value: JSONToLisp(m["value"])}})
+					list = append(list, slip.List{
+						jsonToLisp(key, octets),
+						slip.Tail{Value: jsonToLisp(m["value"], octets)},
+					})
 					continue
 				}
 			}
-			list = append(list, JSONToLisp(v))
+			list = append(list, jsonToLisp(v, octets))
 		}
 		obj = list
 	case map[string]any:
 		list := make(slip.List, 0, len(tv))
 		for k, v2 := range tv {
-			list = append(list, slip.List{slip.String(k), slip.Tail{Value: JSONToLisp(v2)}})
+			list = append(list, slip.List{slip.String(k), slip.Tail{Value: jsonToLisp(v2, octets)}})
 		}
 		obj = list
 	}

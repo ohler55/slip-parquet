@@ -73,10 +73,10 @@ type Rows struct {
 // Call the function with the arguments provided.
 func (f *Rows) Call(s *slip.Scope, args slip.List, depth int) slip.Object {
 	slip.CheckArgCount(s, depth, f, args, 2, 7)
-	fr := readerArg(s, args, depth)
+	fr, octets := readerOctets(s, args, depth)
 	ids, offset, limit := parseRowOpts(s, args[2:], depth)
 	rows := make(slip.List, 0, rowCap(fr, limit))
-	rr := newRowReader(s, fr, ids, args[1], offset, limit, depth)
+	rr := newRowReader(s, fr, ids, args[1], offset, limit, octets, depth)
 	for {
 		row := rr.next()
 		if row == nil {
