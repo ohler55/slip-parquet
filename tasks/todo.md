@@ -59,16 +59,18 @@ Verified against `stanfordnlp/imdb` before planning:
 
 ## Steps
 
-### 1. HTTP range reader
+### 1. HTTP range reader — DONE
 New `httpreader.go`: `httpReaderAt` implementing `ReadAt`/`Read`/`Seek`.
 HEAD to resolve redirects (HF redirects to a CDN host) and read
 `Content-Length`; refuse if `Accept-Ranges: bytes` is absent. Configurable
 timeout. Sends `Authorization: Bearer $HF_TOKEN` when that env var is set, so
 gated datasets work.
 
-*Verify:* unit tests against an `httptest.Server` serving a fixture with range
-support — full read, partial read, past-EOF read, missing `Accept-Ranges`,
-non-200, redirect. One build-tagged test hitting the real imdb URL.
+*Verified:* 22 tests in `httpreader_test.go`, 100% of `newHTTPReader` and
+92.6% of `ReadAt` covered. Includes serving a real fixture over HTTP and
+diffing every value against the same file read from disk, and a check that
+reading metadata alone fetches under half the file. Live test against imdb
+behind `-tags hflive` passes (25000 rows, 25 row groups).
 
 ### 2. Wire remote into `parquet-open`
 Split `initReader` into local and remote paths on URL prefix. Ensure
