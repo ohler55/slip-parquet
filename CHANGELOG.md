@@ -23,6 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the column so the choice belongs to the caller.
 - `ArrayValueOctets` and `JSONToLispOctets` go functions alongside the existing `ArrayValue`
   and `JSONToLisp` which are unchanged.
+- A Usage section in the README covering rows, paging, remote files, row groups, statistics,
+  metadata, nulls, and binary columns. Every example in it is run by the tests.
 
 ### Changed
 - Migrated from `github.com/apache/arrow/go/v15` v15.0.2 to `github.com/apache/arrow-go/v18` v18.7.0.
@@ -30,6 +32,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   longer maintained. Import paths only, no API changes.
 - Opening a file that can not be read now raises a _file-error_ instead of a raw error. This
   applies to local files as well as remote ones.
+- Stopping part way through `:each-row` with a _block_ and _return-from_ is now documented and
+  covered by tests. The reader is left open so it can still be used afterwards.
 
 ### Fixed
 - A null column value is now _nil_ instead of the zero value of the column type. Previously a
