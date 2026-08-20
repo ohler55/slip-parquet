@@ -104,6 +104,8 @@ func (f *Explore) Call(s *slip.Scope, args slip.List, depth int) slip.Object {
 	sh, octets := readerOctets(s, args, depth)
 	opt := exploreOpts(s, args[1:], depth)
 
+	head := exploreHead(s, sh, opt, depth)
+
 	// Only the rows shown are read so exploring a large file is cheap.
 	rr := newRowReader(s, sh, opt.ids, slip.Symbol(":list"), opt.offset, opt.limit, octets, depth)
 	rows := make([][]string, 0, opt.limit)
@@ -119,7 +121,6 @@ func (f *Explore) Call(s *slip.Scope, args slip.List, depth int) slip.Object {
 		}
 		rows = append(rows, cells)
 	}
-	head := exploreHead(s, sh, opt, depth)
 
 	var b []byte
 	if opt.summary {

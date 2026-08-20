@@ -31,6 +31,12 @@ func TestExploreMarkdown(t *testing.T) {
 `, explored(t, scope, ":limit 3"))
 }
 
+// The default format can also be asked for by name.
+func TestExploreMarkdownExplicit(t *testing.T) {
+	scope := reader(t, "multi-group.parquet")
+	tt.Equal(t, explored(t, scope, ":limit 2"), explored(t, scope, ":limit 2 :format :markdown"))
+}
+
 func TestExploreTSV(t *testing.T) {
 	scope := reader(t, "multi-group.parquet")
 	tt.Equal(t, "id\tname\n0\trow-00\n1\trow-01\n", explored(t, scope, ":limit 2 :format :tsv"))
@@ -179,6 +185,7 @@ func TestExploreBadArgs(t *testing.T) {
 		`(parquet-explore reader :limit)`,
 		`(parquet-explore reader :stream 7)`,
 		`(parquet-explore reader '("nope"))`,
+		`(parquet-explore reader '("id") 7 1)`,
 	} {
 		(&sliptest.Function{Scope: scope, Source: src, Panics: true}).Test(t)
 	}
