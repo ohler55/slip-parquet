@@ -192,14 +192,21 @@ func openOne(
 	if isURL(path) {
 		var hr *httpReader
 		if hr, err = newHTTPReader(ctx, path, wait); err == nil {
-			pr, err = file.NewParquetReader(hr)
+			if pr, err = file.NewParquetReader(hr); err != nil {
+				// Nothing else holds the reader yet so the connections it
+				// opened are released here.
+				_ = hr.Close()
+			}
 		}
 	} else {
 		pr, err = file.OpenParquetFile(path, true)
 	}
 	var fr *pqarrow.FileReader
 	if err == nil {
-		fr, err = pqarrow.NewFileReader(pr, pqarrow.ArrowReadProperties{}, memory.DefaultAllocator)
+		if fr, err = pqarrow.NewFileReader(pr, pqarrow.ArrowReadProperties{}, memory.DefaultAllocator); err != nil {
+			// The file is already open so it must be closed before giving up on it.
+			_ = pr.Close()
+		}
 	}
 	if err != nil {
 		slip.FilePanic(s, depth, slip.String(path), "%s", err)
