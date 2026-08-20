@@ -289,14 +289,24 @@ the six function files that still unwrapped inline now use the helper.
 `shard` key, and row group numbers now run across the dataset rather than
 within a file. Tests, doc strings, and the README were updated together.
 
-## 11. Dictionary column fast path
+## 11. Dictionary column fast path — DONE
 
 Dictionary encoded columns fall through to `GetOneForMarshal` and are decoded
 via JSON. Correct but slow, and HuggingFace leans on dictionary encoding for
 categorical strings.
 
-*Verify:* an `*array.Dictionary` case in `arrayValue` returns values equal to
-the current JSON path for every index type; a benchmark shows it is faster.
+*Verified:* an `*array.Dictionary` case follows the index into the dictionary
+and recurses on the typed path. `TestDictionaryMatchesJSONPath` cross-checks
+the result against what the old marshal path produced for all 8 index widths
+crossed with string, int64, and float64 value types, including nulls — 96
+comparisons. The octets option still applies to a dictionary of binary values.
+
+    BenchmarkDictionaryTyped      23423 ns/op   16000 B/op   1000 allocs/op
+    BenchmarkDictionaryMarshal    32695 ns/op   32000 B/op   2000 allocs/op
+
+1.4x faster and half the allocations — one per value instead of two, the
+saving being the interface boxing `GetOneForMarshal` does. Both benchmarks are
+kept so the comparison stays checkable.
 
 ## 12. Context plumbing
 

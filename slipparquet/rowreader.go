@@ -421,6 +421,12 @@ func arrayValue(aa arrow.Array, i int, octets bool) (value slip.Object) {
 		value = slip.Time(tc.Value(i).ToTime(tu))
 	case *array.Duration: // Measure of elapsed time in either seconds, milliseconds, microseconds or nanoseconds
 		value = slip.Fixnum(tc.Value(i))
+	case *array.Dictionary: // values held once and referred to by index
+		// Following the index into the dictionary keeps the value on the typed
+		// path. Without this a dictionary column is encoded to JSON and parsed
+		// back for every row, and categorical columns are usually dictionary
+		// encoded so that is a common case rather than a rare one.
+		value = arrayValue(tc.Dictionary(), tc.GetValueIndex(i), octets)
 
 	default:
 		// Includes array.Struct, array.List, and array.Map since there does
