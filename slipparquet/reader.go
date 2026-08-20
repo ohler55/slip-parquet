@@ -66,31 +66,19 @@ func (caller readerInitCaller) Call(s *slip.Scope, args slip.List, depth int) sl
 	if 0 < len(args) {
 		args = args[0].(slip.List)
 	}
-	var (
-		paths             []string
-		binaryAs, timeout slip.Object
-	)
+	var paths []string
 	for i := 0; i < len(args); i += 2 {
 		key, _ := args[i].(slip.Symbol)
-		k := string(key)
-		switch {
-		case strings.EqualFold(":file", k):
+		if strings.EqualFold(":file", string(key)) {
 			paths = pathsArg(s, args[i+1], ":file", depth)
-		case strings.EqualFold(":binary-as", k):
-			binaryAs = args[i+1]
-		case strings.EqualFold(":timeout", k):
-			timeout = args[i+1]
 		}
 	}
 	// An init keyword that matches an instance variable is assigned by the
-	// flavor before :init runs and does not appear in the arguments, so pick
-	// it up from the instance variable to check it.
-	if binaryAs == nil {
-		binaryAs = obj.Get("binary-as")
-	}
-	if timeout == nil {
-		timeout = obj.Get("timeout")
-	}
+	// flavor before :init runs and never appears in the arguments, so
+	// :binary-as and :timeout are read back from the instance variables. Only
+	// :file has no matching variable and so has to be picked out above.
+	binaryAs := obj.Get("binary-as")
+	timeout := obj.Get("timeout")
 	initReader(s, obj, paths, binaryAsArg(s, binaryAs, depth), timeout, depth)
 
 	return nil

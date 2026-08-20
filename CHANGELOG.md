@@ -50,6 +50,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   encoding each value and parsing it back. 1.4 times faster with half the allocations. Values
   are unchanged.
 
+### Removed
+- Dead `:binary-as` and `:timeout` handling in the reader `:init` method. A flavor init keyword
+  that matches an instance variable is assigned before `:init` runs and never reaches it, so
+  those branches could not execute. Behaviour is unchanged.
+
 ### Fixed
 - Decimal column values keep the scale the column declares. A decimal of scale 2 holding 10.50
   read as _"10.5"_ and one holding 0.00 read as _"0"_ because the value was formatted through a

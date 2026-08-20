@@ -122,9 +122,6 @@ func rowGroupsFor(pr *file.Reader, offset, limit int64) (groups []int, skip int6
 	if offset <= 0 && limit < 0 {
 		return nil, 0
 	}
-	if limit == 0 {
-		return []int{}, 0
-	}
 	md := pr.MetaData()
 	var start, taken int64
 	for i := 0; i < pr.NumRowGroups(); i++ {
@@ -143,6 +140,8 @@ func rowGroupsFor(pr *file.Reader, offset, limit int64) (groups []int, skip int6
 		}
 		start += cnt
 	}
+	// An empty list is not the same as nil here. A nil means every row group
+	// is wanted, so a range that matched nothing has to say so explicitly.
 	if groups == nil {
 		groups = []int{}
 	}

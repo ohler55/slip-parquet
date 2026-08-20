@@ -370,3 +370,34 @@ any existing caller will see.
 Decimals stay strings. `slip.Ratio` was considered since it is exact and
 supports arithmetic, but it prints a scale 2 `10.50` as `21/2`, which is worse
 than useless for browsing a money column.
+
+
+## 14. Coverage cleanup — DONE
+
+Closing the gaps found in the coverage audit. 96.5% -> 97.0%, 199 -> 211 tests.
+
+**Dead code removed rather than tested.** The `:binary-as` and `:timeout` arms
+of the `:init` switch could never run: a flavor init keyword that matches an
+instance variable is assigned before `:init` and stripped from the arguments,
+so the instance variable read below was what actually ran. Only `:file` has no
+matching variable and still needs picking out. The `limit == 0` early return in
+`rowGroupsFor` was also unreachable since `rowPlan` returns before calling it.
+
+**Statistics gaps closed.** New fixture `stats-types.parquet` carries float32,
+fixed size binary, decimal, and boolean columns so those min/max branches are
+exercised from lisp. `findLeafColumn` is now 100%: all three lookup passes have
+tests, including the bare leaf name of a nested column (`a` for `st.a`), a
+symbol instead of a string, and the case insensitive fallback. `statNum` is
+100% via internal tests that build stat blocks directly, including the Int96
+encoded bytes fallback that no writer here produces.
+
+**Other gaps closed.** New fixture `big.parquet` holds 10000 rows in one row
+group so an offset past the 4096 batch size makes the skip loop run more than
+once. Shards differing in field count. An empty column list giving no rows. A
+`:timeout` given as a single float.
+
+**Left uncovered deliberately** — 32 statements, all defensive: `err != nil`
+on calls that cannot fail once a reader is open, nil guards that exist so the
+helpers are safe to call, `HasDistinctCount` which arrow documents as never
+populated by the writer, and files with zero row groups or zero columns which
+no writer produces.

@@ -272,3 +272,50 @@ func TestPagingRemoteFetchesLess(t *testing.T) {
 	}
 	t.Logf("full read %d bytes, :limit 1 read %d bytes", full, limited)
 }
+
+// big.parquet holds 10000 rows in one row group. An offset past the 4096 batch
+// size makes the skip run more than once, which a small fixture never does.
+func TestPagingSkipsAcrossBatches(t *testing.T) {
+	scope := reader(t, "big.parquet")
+	(&sliptest.Function{
+		Scope:  scope,
+		Source: `(parquet-rows reader :list '("id") :offset 5000 :limit 3)`,
+		Expect: `((5000) (5001) (5002))`,
+	}).Test(t)
+	// More than two batches in.
+	(&sliptest.Function{
+		Scope:  scope,
+		Source: `(parquet-rows reader :list '("id") :offset 9998)`,
+		Expect: `((9998) (9999))`,
+	}).Test(t)
+	// A limit larger than a batch spans batches on the way out too.
+	(&sliptest.Function{
+		Scope:  scope,
+		Source: `(length (parquet-rows reader :list '("id") :offset 100 :limit 5000))`,
+		Expect: "5000",
+	}).Test(t)
+	(&sliptest.Function{
+		Scope:  scope,
+		Source: `(car (nth 4999 (parquet-rows reader :list '("id") :offset 100 :limit 5000)))`,
+		Expect: "5099",
+	}).Test(t)
+}
+
+// Asking for no columns at all gives no rows rather than every column.
+func TestRowsNoColumns(t *testing.T) {
+	scope := reader(t, "multi-group.parquet")
+	(&sliptest.Function{
+		Scope:  scope,
+		Source: `(parquet-rows reader :list (list))`,
+		Expect: "nil",
+	}).Test(t)
+	scope.Let("seen", nil)
+	(&sliptest.Function{
+		Scope: scope,
+		Source: `(progn
+                   (setq seen 0)
+                   (parquet-each-row reader (lambda (row) (setq seen (+ seen 1))) :list (list))
+                   seen)`,
+		Expect: "0",
+	}).Test(t)
+}

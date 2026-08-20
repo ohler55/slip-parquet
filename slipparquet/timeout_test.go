@@ -116,3 +116,18 @@ func TestCloseCancelsReads(t *testing.T) {
 		Expect: "t",
 	}).Test(t)
 }
+
+// A timeout given as a single float is accepted as well as a fixnum or a
+// double.
+func TestTimeoutSingleFloat(t *testing.T) {
+	scope := slip.NewScope()
+	scope.Let("reader", nil)
+	_ = slip.ReadString(
+		`(setq reader (parquet-open "testdata/primitive.parquet" :timeout 1.5s0))`, scope).Eval(scope, nil)
+	defer func() { _ = slip.ReadString(`(send reader :close)`, scope).Eval(scope, nil) }()
+	(&sliptest.Function{
+		Scope:  scope,
+		Source: `(send reader :row-count)`,
+		Expect: "8",
+	}).Test(t)
+}

@@ -263,3 +263,12 @@ func TestShardsMakeInstance(t *testing.T) {
 		Expect: "15",
 	}).Test(t)
 }
+
+// Shards that differ in how many columns they have are caught the same way as
+// ones that differ in column names.
+func TestShardsFieldCountMismatch(t *testing.T) {
+	(&sliptest.Function{
+		Source:    `(parquet-open '("testdata/shard-0.parquet" "testdata/primitive.parquet"))`,
+		PanicType: slip.Symbol("error"),
+	}).Test(t)
+}

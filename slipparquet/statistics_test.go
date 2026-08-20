@@ -171,3 +171,84 @@ func TestStatisticsBadArgs(t *testing.T) {
 		Panics: true,
 	}).Test(t)
 }
+
+// stats-types.parquet carries a float32, a fixed size binary, a decimal, and a
+// boolean column so the min/max branches for those types are exercised.
+func TestStatisticsFloat32(t *testing.T) {
+	scope := reader(t, "stats-types.parquet")
+	(&sliptest.Function{
+		Scope:  scope,
+		Source: `(cdr (assoc "min" (car (parquet-statistics reader "f32"))))`,
+		Expect: "-2.25",
+	}).Test(t)
+	(&sliptest.Function{
+		Scope:  scope,
+		Source: `(cdr (assoc "max" (car (parquet-statistics reader "f32"))))`,
+		Expect: "3.75",
+	}).Test(t)
+}
+
+func TestStatisticsFixedSizeBinary(t *testing.T) {
+	scope := reader(t, "stats-types.parquet")
+	(&sliptest.Function{
+		Scope:  scope,
+		Source: `(cdr (assoc "min" (car (parquet-statistics reader "fsb"))))`,
+		Expect: `"aaa"`,
+	}).Test(t)
+	(&sliptest.Function{
+		Scope:  scope,
+		Source: `(cdr (assoc "max" (car (parquet-statistics reader "fsb"))))`,
+		Expect: `"zzz"`,
+	}).Test(t)
+}
+
+// A decimal column stores its statistics as a fixed length byte array so the
+// min and max are the physical bytes, not the decimal.
+func TestStatisticsDecimal(t *testing.T) {
+	scope := reader(t, "stats-types.parquet")
+	(&sliptest.Function{
+		Scope:  scope,
+		Source: `(stringp (cdr (assoc "min" (car (parquet-statistics reader "dec")))))`,
+		Expect: "t",
+	}).Test(t)
+}
+
+// Boolean statistics: a column holding both values has a min of false, which
+// is nil, and a max of true.
+func TestStatisticsBoolean(t *testing.T) {
+	scope := reader(t, "stats-types.parquet")
+	(&sliptest.Function{
+		Scope:  scope,
+		Source: `(cdr (assoc "min" (car (parquet-statistics reader "flag"))))`,
+		Expect: "nil",
+	}).Test(t)
+	(&sliptest.Function{
+		Scope:  scope,
+		Source: `(cdr (assoc "max" (car (parquet-statistics reader "flag"))))`,
+		Expect: "t",
+	}).Test(t)
+}
+
+// A column can be named by a bare leaf name, by a symbol, and case
+// insensitively, not just by its exact dotted path.
+func TestStatisticsColumnLookup(t *testing.T) {
+	scope := reader(t, "nulls.parquet")
+	// The bare leaf name of a nested column rather than its st.a path.
+	(&sliptest.Function{
+		Scope:  scope,
+		Source: `(equal (parquet-statistics reader "a") (parquet-statistics reader "st.a"))`,
+		Expect: "t",
+	}).Test(t)
+	// A symbol instead of a string.
+	(&sliptest.Function{
+		Scope:  scope,
+		Source: `(equal (parquet-statistics reader 'i64) (parquet-statistics reader "i64"))`,
+		Expect: "t",
+	}).Test(t)
+	// Case insensitive path as a last resort.
+	(&sliptest.Function{
+		Scope:  scope,
+		Source: `(equal (parquet-statistics reader "ST.A") (parquet-statistics reader "st.a"))`,
+		Expect: "t",
+	}).Test(t)
+}
