@@ -203,3 +203,27 @@ func TestLiveHuggingFaceShards(t *testing.T) {
 		Expect: "1",
 	}).Test(t)
 }
+
+// Exploring a remote dataset shows a few rows without reading the file.
+func TestLiveHuggingFaceExplore(t *testing.T) {
+	scope := slip.NewScope()
+	scope.Let("reader", nil)
+	_ = slip.ReadString(fmt.Sprintf(`(setq reader (parquet-open "%s"))`, imdbURL), scope).Eval(scope, nil)
+	defer func() { _ = slip.ReadString(`(send reader :close)`, scope).Eval(scope, nil) }()
+
+	v := slip.ReadString(
+		`(with-output-to-string (s) (parquet-explore reader :limit 3 :summary t :stream s))`,
+		scope).Eval(scope, nil)
+	out, _ := v.(slip.String)
+	lines := strings.Split(string(out), "\n")
+	tt.Equal(t, "25000 rows, 2 columns, 25 row groups, showing 1-3", lines[0])
+	// Summary, blank, header, rule, three rows, and the trailing newline.
+	tt.Equal(t, 8, len(lines))
+	// Every line of the table is the same width even though the reviews are
+	// thousands of characters long.
+	width := len([]rune(lines[2]))
+	for _, ln := range lines[2:7] {
+		tt.Equal(t, width, len([]rune(ln)), ln)
+	}
+	fmt.Println(string(out))
+}

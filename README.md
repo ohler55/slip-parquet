@@ -112,6 +112,54 @@ does not bound the transfer of the body since a single column chunk can
 legitimately take a long time over a slow link. Closing the reader
 cancels any read still in flight.
 
+### Looking at a file
+
+`parquet-explore` writes a few rows as a table. It is for eyeballing a
+file rather than for reading it, so values are cut short and only the
+rows shown are read.
+
+```lisp
+(parquet-explore reader :limit 3 :summary t)
+```
+
+```
+25000 rows, 2 columns, 25 row groups, showing 1-3
+
+| text                                     | label |
+| ---------------------------------------- | ----- |
+| I rented I AM CURIOUS-YELLOW from my vi… | 0     |
+| "I Am Curious: Yellow" is a risible and… | 0     |
+| If only to avoid making this type of fi… | 0     |
+```
+
+That came from a 21MB file over the network and read three rows of it.
+
+The columns can be picked the same way as with `:rows`, and `:tsv` gives
+tab separated output for pasting into a spreadsheet.
+
+```lisp
+(parquet-explore reader '("id" "name") :limit 2 :format :tsv)
+```
+
+```
+id	name
+0	row-00
+1	row-01
+```
+
+`:width` sets how much of a value is shown, 40 by default, and a zero
+leaves values whole. `:offset` starts somewhere other than the beginning.
+The summary line is off by default so the output can be pasted straight
+into a document, and `:stream` writes somewhere other than
+`*standard-output*`.
+
+A null shows as an empty cell, which makes it look the same as an empty
+string. Pass `:null` when the difference matters.
+
+```lisp
+(parquet-explore reader :null "NULL")
+```
+
 ### Datasets split into shards
 
 A dataset is often stored as several files rather than one. A HuggingFace

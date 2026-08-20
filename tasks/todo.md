@@ -401,3 +401,34 @@ on calls that cannot fail once a reader is open, nil guards that exist so the
 helpers are safe to call, `HasDistinctCount` which arrow documents as never
 populated by the writer, and files with zero row groups or zero columns which
 no writer produces.
+
+
+## 15. parquet-explore — DONE
+
+A table view for eyeballing a file, which is what browsing a dataset was
+missing. `(parquet-explore reader &optional column-ids &key :format :limit
+:offset :width :null :summary :stream)`.
+
+Follows `describe` in writing to `*standard-output*` and returning `Novalue`
+rather than returning a string, since a returned string prints with escaped
+newlines and is unreadable in a REPL. `:stream` keeps it capturable and
+`with-output-to-string` works. `column-ids` is optional and positional exactly
+as on `:rows` and `:each-row` so the package reads the same way throughout.
+
+Decisions taken with joe:
+
+- **Nulls are a blank cell by default** with a `:null` option, matching psql.
+  Worth knowing that this means a null and an empty string look the same in the
+  table even though `:rows` tells them apart. `:null "NULL"` when it matters.
+- **The summary line is opt in** via `:summary t` so the default output pastes
+  straight into markdown or a spreadsheet.
+- **Defaults are 10 rows and a width of 40**, the wider cell suiting the text
+  heavy columns a HuggingFace dataset tends to have.
+
+Details handled: newlines and tabs in a value are flattened since one review
+holding a newline would shred the table, `|` is escaped in markdown cells,
+truncation and padding are rune aware.
+
+*Verified:* 14 tests comparing whole tables rather than fragments, including
+that every rendered line is the same rune width. Live test explores imdb and
+checks the alignment holds with reviews thousands of characters long.

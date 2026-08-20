@@ -28,6 +28,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `parquet-open` and the `:file` init keyword accept a list of files. The files are read as one
   table with the row counts summed and the rows read shard by shard, which is the shape of a
   HuggingFace dataset split. Shards must share a schema.
+- `parquet-explore` writes a few rows of a reader as a markdown or TSV table. Values are cut
+  short so a column of long text stays readable and only the rows shown are read, so it is
+  cheap on a large or remote file. Takes `:format`, `:limit`, `:offset`, `:width`, `:null`,
+  `:summary`, and `:stream`.
 - A `:timeout` option on `parquet-open` and the reader init keywords giving the number of
   seconds a remote server has to answer. The default is 30, which is what was previously
   hard coded. It covers connecting and waiting for the response headers and does not bound
