@@ -42,7 +42,7 @@ func TestHTTPReaderSize(t *testing.T) {
 	ts := rangeServer()
 	defer ts.Close()
 
-	r, err := newHTTPReader(ts.URL + "/sample.parquet")
+	r, err := newHTTPReader(context.Background(), ts.URL+"/sample.parquet", 0)
 	tt.Nil(t, err)
 	defer func() { _ = r.Close() }()
 	tt.Equal(t, int64(len(content)), r.size)
@@ -52,7 +52,7 @@ func TestHTTPReaderReadAt(t *testing.T) {
 	ts := rangeServer()
 	defer ts.Close()
 
-	r, err := newHTTPReader(ts.URL + "/sample.parquet")
+	r, err := newHTTPReader(context.Background(), ts.URL+"/sample.parquet", 0)
 	tt.Nil(t, err)
 	defer func() { _ = r.Close() }()
 
@@ -79,7 +79,7 @@ func TestHTTPReaderReadAtWhole(t *testing.T) {
 	ts := rangeServer()
 	defer ts.Close()
 
-	r, err := newHTTPReader(ts.URL + "/sample.parquet")
+	r, err := newHTTPReader(context.Background(), ts.URL+"/sample.parquet", 0)
 	tt.Nil(t, err)
 	defer func() { _ = r.Close() }()
 
@@ -94,7 +94,7 @@ func TestHTTPReaderReadAtPastEnd(t *testing.T) {
 	ts := rangeServer()
 	defer ts.Close()
 
-	r, err := newHTTPReader(ts.URL + "/sample.parquet")
+	r, err := newHTTPReader(context.Background(), ts.URL+"/sample.parquet", 0)
 	tt.Nil(t, err)
 	defer func() { _ = r.Close() }()
 
@@ -112,7 +112,7 @@ func TestHTTPReaderReadAtSpanningEnd(t *testing.T) {
 	ts := rangeServer()
 	defer ts.Close()
 
-	r, err := newHTTPReader(ts.URL + "/sample.parquet")
+	r, err := newHTTPReader(context.Background(), ts.URL+"/sample.parquet", 0)
 	tt.Nil(t, err)
 	defer func() { _ = r.Close() }()
 
@@ -128,7 +128,7 @@ func TestHTTPReaderReadAtEmpty(t *testing.T) {
 	ts := rangeServer()
 	defer ts.Close()
 
-	r, err := newHTTPReader(ts.URL + "/sample.parquet")
+	r, err := newHTTPReader(context.Background(), ts.URL+"/sample.parquet", 0)
 	tt.Nil(t, err)
 	defer func() { _ = r.Close() }()
 
@@ -141,7 +141,7 @@ func TestHTTPReaderReadAtNegative(t *testing.T) {
 	ts := rangeServer()
 	defer ts.Close()
 
-	r, err := newHTTPReader(ts.URL + "/sample.parquet")
+	r, err := newHTTPReader(context.Background(), ts.URL+"/sample.parquet", 0)
 	tt.Nil(t, err)
 	defer func() { _ = r.Close() }()
 
@@ -153,7 +153,7 @@ func TestHTTPReaderRead(t *testing.T) {
 	ts := rangeServer()
 	defer ts.Close()
 
-	r, err := newHTTPReader(ts.URL + "/sample.parquet")
+	r, err := newHTTPReader(context.Background(), ts.URL+"/sample.parquet", 0)
 	tt.Nil(t, err)
 	defer func() { _ = r.Close() }()
 
@@ -173,7 +173,7 @@ func TestHTTPReaderSeek(t *testing.T) {
 	ts := rangeServer()
 	defer ts.Close()
 
-	r, err := newHTTPReader(ts.URL + "/sample.parquet")
+	r, err := newHTTPReader(context.Background(), ts.URL+"/sample.parquet", 0)
 	tt.Nil(t, err)
 	defer func() { _ = r.Close() }()
 
@@ -199,7 +199,7 @@ func TestHTTPReaderSeekBad(t *testing.T) {
 	ts := rangeServer()
 	defer ts.Close()
 
-	r, err := newHTTPReader(ts.URL + "/sample.parquet")
+	r, err := newHTTPReader(context.Background(), ts.URL+"/sample.parquet", 0)
 	tt.Nil(t, err)
 	defer func() { _ = r.Close() }()
 
@@ -217,7 +217,7 @@ func TestHTTPReaderNoRangeSupport(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	_, err := newHTTPReader(ts.URL + "/sample.parquet")
+	_, err := newHTTPReader(context.Background(), ts.URL+"/sample.parquet", 0)
 	tt.NotNil(t, err)
 }
 
@@ -229,7 +229,7 @@ func TestHTTPReaderNoContentLength(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	_, err := newHTTPReader(ts.URL + "/sample.parquet")
+	_, err := newHTTPReader(context.Background(), ts.URL+"/sample.parquet", 0)
 	tt.NotNil(t, err)
 }
 
@@ -237,7 +237,7 @@ func TestHTTPReaderNoContentLength(t *testing.T) {
 // rather than a short read.
 func TestHTTPReaderServerGone(t *testing.T) {
 	ts := rangeServer()
-	r, err := newHTTPReader(ts.URL + "/sample.parquet")
+	r, err := newHTTPReader(context.Background(), ts.URL+"/sample.parquet", 0)
 	tt.Nil(t, err)
 	defer func() { _ = r.Close() }()
 	ts.Close()
@@ -252,15 +252,15 @@ func TestHTTPReaderNotFound(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	_, err := newHTTPReader(ts.URL + "/missing.parquet")
+	_, err := newHTTPReader(context.Background(), ts.URL+"/missing.parquet", 0)
 	tt.NotNil(t, err)
 }
 
 func TestHTTPReaderBadURL(t *testing.T) {
-	_, err := newHTTPReader("http://%zz/bad.parquet")
+	_, err := newHTTPReader(context.Background(), "http://%zz/bad.parquet", 0)
 	tt.NotNil(t, err)
 
-	_, err = newHTTPReader("http://127.0.0.1:0/nothing.parquet")
+	_, err = newHTTPReader(context.Background(), "http://127.0.0.1:0/nothing.parquet", 0)
 	tt.NotNil(t, err)
 }
 
@@ -277,7 +277,7 @@ func TestHTTPReaderRangeIgnored(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	r, err := newHTTPReader(ts.URL + "/sample.parquet")
+	r, err := newHTTPReader(context.Background(), ts.URL+"/sample.parquet", 0)
 	tt.Nil(t, err)
 	defer func() { _ = r.Close() }()
 
@@ -294,7 +294,7 @@ func TestHTTPReaderRedirect(t *testing.T) {
 	}))
 	defer rs.Close()
 
-	r, err := newHTTPReader(rs.URL + "/sample.parquet")
+	r, err := newHTTPReader(context.Background(), rs.URL+"/sample.parquet", 0)
 	tt.Nil(t, err)
 	defer func() { _ = r.Close() }()
 	tt.Equal(t, int64(len(content)), r.size)
@@ -332,7 +332,7 @@ func TestHTTPReaderSendsToken(t *testing.T) {
 
 	// The test server is not a hub host so no token is sent.
 	t.Setenv("HF_TOKEN", "secret")
-	r, err := newHTTPReader(ts.URL + "/sample.parquet")
+	r, err := newHTTPReader(context.Background(), ts.URL+"/sample.parquet", 0)
 	tt.Nil(t, err)
 	defer func() { _ = r.Close() }()
 	tt.Equal(t, "", <-got)
@@ -360,7 +360,7 @@ func TestHTTPReaderDrivesParquet(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	hr, err := newHTTPReader(ts.URL + "/primitive.parquet")
+	hr, err := newHTTPReader(context.Background(), ts.URL+"/primitive.parquet", 0)
 	tt.Nil(t, err)
 	defer func() { _ = hr.Close() }()
 
@@ -427,7 +427,7 @@ func TestHTTPReaderFetchesLessThanWholeFile(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	hr, err := newHTTPReader(ts.URL + "/nested-struct.parquet")
+	hr, err := newHTTPReader(context.Background(), ts.URL+"/nested-struct.parquet", 0)
 	tt.Nil(t, err)
 	defer func() { _ = hr.Close() }()
 

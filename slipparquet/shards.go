@@ -3,6 +3,8 @@
 package slipparquet
 
 import (
+	"context"
+
 	"github.com/apache/arrow-go/v18/arrow"
 	"github.com/apache/arrow-go/v18/parquet/pqarrow"
 	"github.com/ohler55/slip"
@@ -16,6 +18,11 @@ import (
 type shards struct {
 	frs   []*pqarrow.FileReader
 	paths []string
+
+	// ctx is cancelled when the reader is closed which lets a read that is
+	// waiting on a slow server be given up on.
+	ctx    context.Context
+	cancel context.CancelFunc
 }
 
 // first returns the reader for the first shard. The schema, version, and
@@ -57,11 +64,22 @@ func (sh *shards) rowGroup(id int) (shard, local int) {
 	return -1, 0
 }
 
-// close closes every shard.
+// close cancels any read still in flight and closes every shard.
 func (sh *shards) close() {
+	if sh.cancel != nil {
+		sh.cancel()
+	}
 	for _, fr := range sh.frs {
 		_ = fr.ParquetReader().Close()
 	}
+}
+
+// context returns the context reads are made under.
+func (sh *shards) context() context.Context {
+	if sh == nil || sh.ctx == nil {
+		return context.Background()
+	}
+	return sh.ctx
 }
 
 // filepath is the path of the only shard or a list of paths when there are

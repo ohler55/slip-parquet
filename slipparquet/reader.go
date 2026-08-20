@@ -3,7 +3,6 @@
 package slipparquet
 
 import (
-	"context"
 	"strings"
 
 	"github.com/ohler55/slip"
@@ -17,13 +16,14 @@ var readerFlavor *flavors.Flavor
 
 func defReaderFlavor() {
 	readerFlavor = flavors.DefFlavor("parquet-reader-flavor",
-		map[string]slip.Object{"filepath": nil, "binary-as": nil},
+		map[string]slip.Object{"filepath": nil, "binary-as": nil, "timeout": nil},
 		nil,
 		slip.List{
 			slip.List{
 				slip.Symbol(":init-keywords"),
 				slip.Symbol(":file"),
 				slip.Symbol(":binary-as"),
+				slip.Symbol(":timeout"),
 			},
 			slip.Symbol(":gettable-instance-variables"),
 			slip.List{
@@ -31,8 +31,10 @@ func defReaderFlavor() {
 				slip.String(`A parquet reader opens a parquet file and can be used to
 access the content of that file. The file can be a local file or a remote file
 identified by an HTTP or HTTPS URL. The _filepath_ instance variable holds
-whichever was used to open the reader and the _binary-as_ instance variable
-holds how binary column values are represented.`),
+whichever was used to open the reader, or a list of them when the reader was
+opened on several. The _binary-as_ instance variable holds how binary column
+values are represented and _timeout_ how long a remote server is given to
+answer.`),
 			},
 		},
 		&Pkg,
@@ -65,8 +67,8 @@ func (caller readerInitCaller) Call(s *slip.Scope, args slip.List, depth int) sl
 		args = args[0].(slip.List)
 	}
 	var (
-		paths    []string
-		binaryAs slip.Object
+		paths             []string
+		binaryAs, timeout slip.Object
 	)
 	for i := 0; i < len(args); i += 2 {
 		key, _ := args[i].(slip.Symbol)
@@ -76,6 +78,8 @@ func (caller readerInitCaller) Call(s *slip.Scope, args slip.List, depth int) sl
 			paths = pathsArg(s, args[i+1], ":file", depth)
 		case strings.EqualFold(":binary-as", k):
 			binaryAs = args[i+1]
+		case strings.EqualFold(":timeout", k):
+			timeout = args[i+1]
 		}
 	}
 	// An init keyword that matches an instance variable is assigned by the
@@ -84,7 +88,10 @@ func (caller readerInitCaller) Call(s *slip.Scope, args slip.List, depth int) sl
 	if binaryAs == nil {
 		binaryAs = obj.Get("binary-as")
 	}
-	initReader(s, obj, paths, binaryAsArg(s, binaryAs, depth), depth)
+	if timeout == nil {
+		timeout = obj.Get("timeout")
+	}
+	initReader(s, obj, paths, binaryAsArg(s, binaryAs, depth), timeout, depth)
 
 	return nil
 }
@@ -99,7 +106,9 @@ func (caller readerInitCaller) FuncDocs() *slip.FuncDoc {
 				Name: ":file",
 				Type: "string",
 				Text: `The path to a parquet file or an HTTP or HTTPS URL of a remote
-parquet file. Remote files are read with range requests so only the parts used are fetched.`,
+parquet file. Remote files are read with range requests so only the parts used are fetched.
+
+A list of files is read as one table which is how a dataset split into shards is opened.`,
 			},
 			{
 				Name: ":binary-as",
@@ -111,6 +120,15 @@ Parquet stores text and raw bytes in the same physical type and only some writer
 which is which. A column that arrives unannotated is a string by default. Pass _:octets_ to get
 the raw bytes instead, which is what is wanted for a column holding an image, audio, or any
 other binary payload.`,
+			},
+			{
+				Name: ":timeout",
+				Type: "fixnum|float",
+				Text: `How long to wait, in seconds, for a remote server to answer. The default is 30.
+
+The timeout covers connecting and waiting for the response headers. It deliberately does not
+bound the transfer of the body since a single column chunk can legitimately take a long time
+to arrive over a slow link. Has no effect on a local file.`,
 			},
 		},
 	}
@@ -481,7 +499,7 @@ or remote file does not read the whole file.`,
 // column are the values of that column in each shard in order.
 func readColumn(sh *shards, idx int, octets bool) (result slip.List) {
 	for _, fr := range sh.frs {
-		cr, _ := fr.GetColumn(context.Background(), idx)
+		cr, _ := fr.GetColumn(sh.context(), idx)
 		if cr == nil {
 			continue
 		}

@@ -3,8 +3,10 @@
 package slipparquet
 
 import (
+	"context"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -13,9 +15,9 @@ import (
 	"time"
 )
 
-// httpTimeout is how long to wait for the response headers of a range
-// request. It deliberately does not bound the body read since a single column
-// chunk can be large.
+// httpTimeout is the default for how long to wait for the response headers of
+// a range request. It deliberately does not bound the body read since a single
+// column chunk can legitimately take a long time to transfer.
 const httpTimeout = 30 * time.Second
 
 // httpReader reads a parquet file over HTTP using range requests. Parquet is
@@ -26,6 +28,7 @@ type httpReader struct {
 	url    string
 	client *http.Client
 	auth   string
+	ctx    context.Context
 	size   int64
 	pos    int64
 }
@@ -38,15 +41,25 @@ func isURL(path string) bool {
 // newHTTPReader returns a reader for a remote parquet file. The size of the
 // file is determined and the server checked for range request support before
 // returning.
-func newHTTPReader(link string) (*httpReader, error) {
+func newHTTPReader(ctx context.Context, link string, timeout time.Duration) (*httpReader, error) {
+	if timeout <= 0 {
+		timeout = httpTimeout
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	r := httpReader{
 		url:  link,
 		auth: hubToken(link),
+		ctx:  ctx,
 		client: &http.Client{
-			Transport: &http.Transport{ResponseHeaderTimeout: httpTimeout},
+			Transport: &http.Transport{
+				ResponseHeaderTimeout: timeout,
+				DialContext:           (&net.Dialer{Timeout: timeout}).DialContext,
+			},
 		},
 	}
-	req, err := http.NewRequest(http.MethodHead, link, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodHead, link, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -114,7 +127,7 @@ func (r *httpReader) ReadAt(p []byte, off int64) (int, error) {
 	if last := r.size - 1; last < end {
 		end = last
 	}
-	req, err := http.NewRequest(http.MethodGet, r.url, nil)
+	req, err := http.NewRequestWithContext(r.ctx, http.MethodGet, r.url, nil)
 	if err != nil {
 		return 0, err
 	}

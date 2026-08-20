@@ -3,7 +3,9 @@
 package slipparquet
 
 import (
+	"context"
 	"strings"
+	"time"
 
 	"github.com/apache/arrow-go/v18/arrow"
 	"github.com/apache/arrow-go/v18/arrow/memory"
@@ -26,7 +28,10 @@ func init() {
 				{
 					Name: "file",
 					Type: "string",
-					Text: "The parquet file to read. Either a local path or an HTTP or HTTPS URL.",
+					Text: `The parquet file to read. Either a local path or an HTTP or HTTPS URL.
+
+A list of files is read as one table which is how a dataset split into shards is opened. The
+shards must all have the same schema.`,
 				},
 				{Name: "&key"},
 				{
@@ -39,6 +44,15 @@ Parquet stores text and raw bytes in the same physical type and only some writer
 which is which. A column that arrives unannotated is a string by default. Pass _:octets_ to get
 the raw bytes instead, which is what is wanted for a column holding an image, audio, or any
 other binary payload.`,
+				},
+				{
+					Name: ":timeout",
+					Type: "fixnum|float",
+					Text: `How long to wait, in seconds, for a remote server to answer. The default is 30.
+
+The timeout covers connecting and waiting for the response headers. It deliberately does not
+bound the transfer of the body since a single column chunk can legitimately take a long time
+to arrive over a slow link. Has no effect on a local file.`,
 				},
 			},
 			Return: "instance",
@@ -57,6 +71,8 @@ option of _:file_ except that none of the _:init_ daemons are called.`,
 				`(parquet-open "sample.parquet") => #<parquet-reader-flavor 1234>`,
 				`(parquet-open "https://huggingface.co/api/datasets/stanfordnlp/imdb/parquet/plain_text/train/0.parquet")`,
 				`(parquet-open "images.parquet" :binary-as :octets)`,
+				`(parquet-open '("part-0.parquet" "part-1.parquet")) ;; read as one table`,
+				`(parquet-open "https://host/big.parquet" :timeout 5)`,
 			},
 		}, &Pkg)
 }
@@ -68,34 +84,48 @@ type Open struct {
 
 // Call the function with the arguments provided.
 func (f *Open) Call(s *slip.Scope, args slip.List, depth int) slip.Object {
-	slip.CheckArgCount(s, depth, f, args, 1, 3)
+	slip.CheckArgCount(s, depth, f, args, 1, 5)
 	paths := pathsArg(s, args[0], "file", depth)
-	var binaryAs slip.Object
+	var binaryAs, timeout slip.Object
 	for i := 1; i < len(args); i += 2 {
 		sym, _ := args[i].(slip.Symbol)
-		if !strings.EqualFold(":binary-as", string(sym)) {
-			slip.TypePanic(s, depth, "keyword", args[i], ":binary-as")
-		}
 		if len(args) <= i+1 {
 			slip.ErrorPanic(s, depth, "%s is missing a value", sym)
 		}
-		binaryAs = binaryAsArg(s, args[i+1], depth)
+		switch {
+		case strings.EqualFold(":binary-as", string(sym)):
+			binaryAs = binaryAsArg(s, args[i+1], depth)
+		case strings.EqualFold(":timeout", string(sym)):
+			timeout = args[i+1]
+		default:
+			slip.TypePanic(s, depth, "keyword", args[i], ":binary-as", ":timeout")
+		}
 	}
 	inst := readerFlavor.MakeInstance().(*flavors.Instance)
-	initReader(s, inst, paths, binaryAs, depth)
+	initReader(s, inst, paths, binaryAs, timeout, depth)
 
 	return inst
 }
 
 // initReader opens the files of a reader. Each is either a local file or, if
 // the path is an HTTP or HTTPS URL, a remote file read with range requests.
-func initReader(s *slip.Scope, inst *flavors.Instance, paths []string, binaryAs slip.Object, depth int) {
+func initReader(
+	s *slip.Scope,
+	inst *flavors.Instance,
+	paths []string,
+	binaryAs, timeout slip.Object,
+	depth int) {
 	if len(paths) == 0 {
 		slip.ErrorPanic(s, depth, "no parquet file to open")
 	}
-	sh := shards{paths: paths}
+	// The context lives as long as the reader rather than carrying a deadline
+	// so a long browsing session is never cut short. Closing the reader
+	// cancels it which aborts a read waiting on a slow server.
+	ctx, cancel := context.WithCancel(context.Background())
+	sh := shards{paths: paths, ctx: ctx, cancel: cancel}
+	wait := timeoutArg(s, timeout, depth)
 	for _, path := range paths {
-		sh.frs = append(sh.frs, openOne(s, path, depth))
+		sh.frs = append(sh.frs, openOne(s, ctx, path, wait, depth))
 	}
 	// Rows from shards that do not agree on a schema can not be put in the
 	// same table so the mismatch is caught here rather than mid read.
@@ -118,17 +148,47 @@ func initReader(s *slip.Scope, inst *flavors.Instance, paths []string, binaryAs 
 	if binaryAs != nil {
 		inst.Let(slip.Symbol("binary-as"), binaryAs)
 	}
+	if timeout != nil {
+		inst.Let(slip.Symbol("timeout"), timeout)
+	}
+}
+
+// timeoutArg turns a :timeout of seconds into a duration. A missing or zero
+// timeout means the default.
+func timeoutArg(s *slip.Scope, obj slip.Object, depth int) time.Duration {
+	var secs float64
+	switch tv := obj.(type) {
+	case nil:
+		return 0
+	case slip.Fixnum:
+		secs = float64(tv)
+	case slip.SingleFloat:
+		secs = float64(tv)
+	case slip.DoubleFloat:
+		secs = float64(tv)
+	default:
+		slip.TypePanic(s, depth, ":timeout", obj, "fixnum", "float")
+	}
+	if secs < 0 {
+		slip.ErrorPanic(s, depth, ":timeout must not be negative")
+	}
+	return time.Duration(secs * float64(time.Second))
 }
 
 // openOne opens a single parquet file.
-func openOne(s *slip.Scope, path string, depth int) *pqarrow.FileReader {
+func openOne(
+	s *slip.Scope,
+	ctx context.Context,
+	path string,
+	wait time.Duration,
+	depth int) *pqarrow.FileReader {
 	var (
 		pr  *file.Reader
 		err error
 	)
 	if isURL(path) {
 		var hr *httpReader
-		if hr, err = newHTTPReader(path); err == nil {
+		if hr, err = newHTTPReader(ctx, path, wait); err == nil {
 			pr, err = file.NewParquetReader(hr)
 		}
 	} else {

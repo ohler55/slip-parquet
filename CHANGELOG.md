@@ -28,6 +28,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `parquet-open` and the `:file` init keyword accept a list of files. The files are read as one
   table with the row counts summed and the rows read shard by shard, which is the shape of a
   HuggingFace dataset split. Shards must share a schema.
+- A `:timeout` option on `parquet-open` and the reader init keywords giving the number of
+  seconds a remote server has to answer. The default is 30, which is what was previously
+  hard coded. It covers connecting and waiting for the response headers and does not bound
+  the transfer of the body.
 
 ### Changed
 - Migrated from `github.com/apache/arrow/go/v15` v15.0.2 to `github.com/apache/arrow-go/v18` v18.7.0.
@@ -39,7 +43,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   group came from. Row group numbers now run across the whole dataset.
 - Stopping part way through `:each-row` with a _block_ and _return-from_ is now documented and
   covered by tests. The reader is left open so it can still be used afterwards.
-
+- Reads are made under a context owned by the reader rather than `context.Background`. Closing
+  a reader cancels it so a read waiting on a slow server is given up on. Remote requests carry
+  the context so the cancellation reaches the network rather than stopping at the arrow layer.
 - Dictionary encoded columns are read by following the index into the dictionary rather than by
   encoding each value and parsing it back. 1.4 times faster with half the allocations. Values
   are unchanged.

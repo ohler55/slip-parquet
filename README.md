@@ -100,6 +100,18 @@ network. Set the `HF_TOKEN` environment variable to reach a gated or
 private HuggingFace dataset. The token is only ever sent to
 `huggingface.co` and never to any other host.
 
+A remote server is given 30 seconds to answer before the read is given up
+on. Use `:timeout` to change it.
+
+```lisp
+(parquet-open "https://host/big.parquet" :timeout 5)
+```
+
+The timeout covers connecting and waiting for the response headers. It
+does not bound the transfer of the body since a single column chunk can
+legitimately take a long time over a slow link. Closing the reader
+cancels any read still in flight.
+
 ### Datasets split into shards
 
 A dataset is often stored as several files rather than one. A HuggingFace

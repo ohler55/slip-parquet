@@ -182,12 +182,12 @@ func rowPlan(sh *shards, offset, limit int64) (plan []shardPlan) {
 
 // colReader returns a reader for a field. A nil groups reads every row group
 // which is the path taken when there is no offset or limit.
-func colReader(fr *pqarrow.FileReader, i int, groups []int) *pqarrow.ColumnReader {
+func colReader(ctx context.Context, fr *pqarrow.FileReader, i int, groups []int) *pqarrow.ColumnReader {
 	if groups == nil {
-		cr, _ := fr.GetColumn(context.Background(), i)
+		cr, _ := fr.GetColumn(ctx, i)
 		return cr
 	}
-	cr, _ := fr.GetFieldReader(context.Background(), i, allLeaves(fr.ParquetReader()), groups)
+	cr, _ := fr.GetFieldReader(ctx, i, allLeaves(fr.ParquetReader()), groups)
 
 	return cr
 }
@@ -245,7 +245,7 @@ func (rr *rowReader) openShard() {
 	case nil:
 		for i := 0; i < schem.NumFields(); i++ {
 			rr.cra = append(rr.cra, &keyColReader{
-				cr: colReader(fr, i, sp.groups), key: schem.Field(i).Name,
+				cr: colReader(rr.sh.context(), fr, i, sp.groups), key: schem.Field(i).Name,
 				format: rr.format, octets: rr.octets,
 			})
 		}
@@ -256,7 +256,7 @@ func (rr *rowReader) openShard() {
 				slip.ErrorPanic(rr.scope, rr.depth, "column %s not found", id)
 			}
 			rr.cra = append(rr.cra, &keyColReader{
-				cr: colReader(fr, idx, sp.groups), key: schem.Field(idx).Name,
+				cr: colReader(rr.sh.context(), fr, idx, sp.groups), key: schem.Field(idx).Name,
 				format: rr.format, octets: rr.octets,
 			})
 		}

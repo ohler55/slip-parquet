@@ -308,14 +308,31 @@ comparisons. The octets option still applies to a dictionary of binary values.
 saving being the interface boxing `GetOneForMarshal` does. Both benchmarks are
 kept so the comparison stays checkable.
 
-## 12. Context plumbing
+## 12. Context plumbing — DONE
 
 `context.Background()` is hardcoded at every `GetColumn` / `GetFieldReader`
 call. Now that reads are network bound a slow or hung server cannot be given
 up on.
 
-*Verify:* a reader opened against a server that never responds fails rather
-than hanging forever.
+*Verified:* the three hard coded `context.Background()` calls are gone. A
+reader owns a cancellable context created at open, every arrow read is made
+under it, and remote requests are built with `http.NewRequestWithContext` so
+the cancellation reaches the network rather than stopping at the arrow layer.
+`:close` cancels it.
+
+A `:timeout` option was added since a context alone gives the caller nothing to
+control. It sets the dial and response header timeouts, defaulting to the 30
+seconds that used to be hard coded.
+
+`TestTimeoutStalledServer` points a reader at a server that accepts the
+connection and never answers; with `:timeout 0.25` it gives up in 0.25s instead
+of waiting out the default.
+
+**Scoped deliberately:** the timeout covers connecting and waiting for response
+headers, not the transfer of the body. A single column chunk over a slow link
+can legitimately take a long time and a deadline there would fail real reads.
+That was the tradeoff the hard coded `ResponseHeaderTimeout` already made; it
+is now configurable and documented rather than implicit.
 
 ## 13. Decimal cases
 

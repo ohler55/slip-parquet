@@ -10,6 +10,7 @@
 package slipparquet
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"testing"
@@ -27,7 +28,7 @@ const imdbURL = "https://huggingface.co/api/datasets/stanfordnlp/imdb/parquet/pl
 const wikitextBase = "https://huggingface.co/api/datasets/Salesforce/wikitext/parquet/wikitext-103-raw-v1/train/"
 
 func TestLiveHuggingFace(t *testing.T) {
-	r, err := newHTTPReader(imdbURL)
+	r, err := newHTTPReader(context.Background(), imdbURL, 0)
 	tt.Nil(t, err)
 	defer func() { _ = r.Close() }()
 	tt.Equal(t, true, 20_000_000 < r.size)
