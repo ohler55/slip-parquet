@@ -100,7 +100,8 @@ type Explore struct {
 
 // Call the function with the arguments provided.
 func (f *Explore) Call(s *slip.Scope, args slip.List, depth int) slip.Object {
-	slip.CheckArgCount(s, depth, f, args, 1, 12)
+	// A reader, the column ids, and a value for each of the keywords.
+	slip.CheckArgCount(s, depth, f, args, 1, 2+len(exploreKeys)*2)
 	sh, octets := readerOctets(s, args, depth)
 	opt := exploreOpts(s, args[1:], depth)
 
@@ -108,7 +109,7 @@ func (f *Explore) Call(s *slip.Scope, args slip.List, depth int) slip.Object {
 
 	// Only the rows shown are read so exploring a large file is cheap.
 	rr := newRowReader(s, sh, opt.ids, slip.Symbol(":list"), opt.offset, opt.limit, octets, depth)
-	rows := make([][]string, 0, opt.limit)
+	rows := make([][]string, 0, rowCap(sh, opt.limit))
 	for {
 		row := rr.next()
 		if row == nil {

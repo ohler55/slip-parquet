@@ -211,3 +211,22 @@ func TestExploreReturnsNovalue(t *testing.T) {
 	os, _ := out.(slip.String)
 	tt.Equal(t, 3, len(splitLines(string(os))), "the table went to *standard-output*")
 }
+
+// Every keyword can be given at once. The argument count has to leave room for
+// all of them along with the reader and the column ids.
+func TestExploreAllOptionsAtOnce(t *testing.T) {
+	scope := reader(t, "multi-group.parquet")
+	tt.Equal(t, "id\n0\n1\n", explored(t, scope,
+		`'("id") :format :tsv :limit 2 :offset 0 :width 20 :null "NULL" :summary nil`))
+}
+
+// A limit past the end of the file asks for more rows than there are. Only the
+// rows that exist are shown and the space set aside for them stays in step with
+// the file rather than the limit.
+func TestExploreLimitPastEnd(t *testing.T) {
+	scope := reader(t, "multi-group.parquet")
+	cnt := slip.ReadString(`(parquet-row-count reader)`, scope).Eval(scope, nil)
+	rows, _ := cnt.(slip.Fixnum)
+	lines := splitLines(explored(t, scope, `'("id") :limit 1000000000`))
+	tt.Equal(t, int(rows)+2, len(lines), "a header, a rule, and every row of the file")
+}
