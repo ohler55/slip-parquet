@@ -92,7 +92,7 @@ func (caller readerInitCaller) FuncDocs() *slip.FuncDoc {
 			{Name: "&key"},
 			{
 				Name: ":file",
-				Type: "string",
+				Type: "string or list",
 				Text: `The path to a parquet file or an HTTP or HTTPS URL of a remote
 parquet file. Remote files are read with range requests so only the parts used are fetched.
 

@@ -27,7 +27,7 @@ func init() {
 			Args: []*slip.DocArg{
 				{
 					Name: "file",
-					Type: "string",
+					Type: "string or list",
 					Text: `The parquet file to read. Either a local path or an HTTP or HTTPS URL.
 
 A list of files is read as one table which is how a dataset split into shards is opened. The
