@@ -88,7 +88,10 @@ func (f *Open) Call(s *slip.Scope, args slip.List, depth int) slip.Object {
 	paths := pathsArg(s, args[0], "file", depth)
 	var binaryAs, timeout slip.Object
 	for i := 1; i < len(args); i += 2 {
-		sym, _ := args[i].(slip.Symbol)
+		sym, ok := args[i].(slip.Symbol)
+		if !ok {
+			slip.TypePanic(s, depth, "keyword", args[i], ":binary-as", ":timeout")
+		}
 		if len(args) <= i+1 {
 			slip.ErrorPanic(s, depth, "%s is missing a value", sym)
 		}
