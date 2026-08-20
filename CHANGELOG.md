@@ -51,6 +51,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   are unchanged.
 
 ### Fixed
+- Decimal column values keep the scale the column declares. A decimal of scale 2 holding 10.50
+  read as _"10.5"_ and one holding 0.00 read as _"0"_ because the value was formatted through a
+  float which drops trailing zeros. They now read as _"10.50"_ and _"0.00"_. Decimals are read
+  on the typed path rather than by encoding each value and parsing it back. There was no loss
+  of precision before and there is none now.
 - A null column value is now _nil_ instead of the zero value of the column type. Previously a
   null integer was indistinguishable from a 0, a null string from an empty string, and a null
   date read as the epoch which is a date that was never in the file.

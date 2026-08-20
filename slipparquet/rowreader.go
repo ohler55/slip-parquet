@@ -421,6 +421,14 @@ func arrayValue(aa arrow.Array, i int, octets bool) (value slip.Object) {
 		value = slip.Time(tc.Value(i).ToTime(tu))
 	case *array.Duration: // Measure of elapsed time in either seconds, milliseconds, microseconds or nanoseconds
 		value = slip.Fixnum(tc.Value(i))
+	case *array.Decimal32: // an exact decimal held in 4 bytes
+		value = slip.String(tc.Value(i).ToString(decimalScale(tc.DataType())))
+	case *array.Decimal64: // an exact decimal held in 8 bytes
+		value = slip.String(tc.Value(i).ToString(decimalScale(tc.DataType())))
+	case *array.Decimal128: // an exact decimal held in 16 bytes
+		value = slip.String(tc.Value(i).ToString(decimalScale(tc.DataType())))
+	case *array.Decimal256: // an exact decimal held in 32 bytes
+		value = slip.String(tc.Value(i).ToString(decimalScale(tc.DataType())))
 	case *array.Dictionary: // values held once and referred to by index
 		// Following the index into the dictionary keeps the value on the typed
 		// path. Without this a dictionary column is encoded to JSON and parsed
@@ -438,6 +446,15 @@ func arrayValue(aa arrow.Array, i int, octets bool) (value slip.Object) {
 		value = jsonToLisp(tc.GetOneForMarshal(i), octets)
 	}
 	return
+}
+
+// decimalScale is the number of digits a decimal column keeps after the
+// decimal point.
+func decimalScale(dt arrow.DataType) int32 {
+	if d, ok := dt.(arrow.DecimalType); ok {
+		return d.GetScale()
+	}
+	return 0
 }
 
 // binaryValue returns bytes as either a string or octets.

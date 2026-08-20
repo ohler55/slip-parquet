@@ -243,7 +243,8 @@ Decimal32/64/128/256 cases; `context` plumbing for cancellation.
 
 # Phase 2 — deferred items
 
-Taken from the Out of scope list above, in the order asked for.
+Taken from the Out of scope list above, in the order asked for. **All four
+complete.** 199 tests, race clean, lint clean, plugin builds.
 
 ## 10. Multi-shard datasets — DONE
 
@@ -334,10 +335,38 @@ can legitimately take a long time and a deadline there would fail real reads.
 That was the tradeoff the hard coded `ResponseHeaderTimeout` already made; it
 is now configurable and documented rather than implicit.
 
-## 13. Decimal cases
+## 13. Decimal cases — DONE
 
 Decimal128/256, and now 32/64, have no explicit case so they take the JSON
 path. Precision matters for decimals so this should be deliberate.
 
-*Verify:* a decimal fixture reads back with full precision through the typed
-path and matches what the JSON path produced.
+*Verified:* explicit cases for Decimal32/64/128/256 using each type's own
+`ToString(scale)` rather than the marshal path.
+
+**The premise turned out to be half wrong and half worse than expected.** There
+was no precision loss: the old path went through `big.Float` but round tripped
+all 38 digits of a decimal128 correctly, checked at the limit
+(`99999999999999999999999999999999999999`).
+
+What it did lose was the **scale**. `Text('g', precision)` drops trailing
+zeros, so a money column of scale 2 read back wrong:
+
+| stored | before | after |
+|---|---|---|
+| `10.50` | `10.5` | `10.50` |
+| `10.00` | `10` | `10.00` |
+| `0.1000` (scale 4) | `0.1` | `0.1000` |
+| `-42.10` | `-42.1` | `-42.10` |
+| `0.00` | `0` | `0.00` |
+
+Numerically equal but it discards what the file declares, in the same way the
+null bug was numerically fine and still wrong.
+
+**Visible change on a real fixture:** `byte-array-decimal.parquet` is scale 2,
+so its values went from `"1"`, `"2"` … to `"1.00"`, `"2.00"` …. That is the
+file's own scale, so the new reading is the faithful one, but it is a change
+any existing caller will see.
+
+Decimals stay strings. `slip.Ratio` was considered since it is exact and
+supports arithmetic, but it prints a scale 2 `10.50` as `21/2`, which is worse
+than useless for browsing a money column.
