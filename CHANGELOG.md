@@ -25,6 +25,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and `JSONToLisp` which are unchanged.
 - A Usage section in the README covering rows, paging, remote files, row groups, statistics,
   metadata, nulls, and binary columns. Every example in it is run by the tests.
+- `parquet-open` and the `:file` init keyword accept a list of files. The files are read as one
+  table with the row counts summed and the rows read shard by shard, which is the shape of a
+  HuggingFace dataset split. Shards must share a schema.
 
 ### Changed
 - Migrated from `github.com/apache/arrow/go/v15` v15.0.2 to `github.com/apache/arrow-go/v18` v18.7.0.
@@ -32,6 +35,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   longer maintained. Import paths only, no API changes.
 - Opening a file that can not be read now raises a _file-error_ instead of a raw error. This
   applies to local files as well as remote ones.
+- `parquet-row-group-info` and `parquet-statistics` gained a _shard_ key naming the file a row
+  group came from. Row group numbers now run across the whole dataset.
 - Stopping part way through `:each-row` with a _block_ and _return-from_ is now documented and
   covered by tests. The reader is left open so it can still be used afterwards.
 

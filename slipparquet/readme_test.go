@@ -21,11 +21,11 @@ func TestReadmeExamples(t *testing.T) {
 		{`(send reader :rows :assoc '("id") :offset 10 :limit 2)`, `((("id" . 10)) (("id" . 11)))`},
 		{`(send reader :row-group-count)`, "3"},
 		{`(send reader :row-group-info 1)`,
-			`(("rows" . 5) ("columns" . 2) ("byte-size" . 188) ("compressed-size" . 188))`},
+			`(("shard" . 0) ("rows" . 5) ("columns" . 2) ("byte-size" . 188) ("compressed-size" . 188))`},
 		// The printed form of this one wraps so check the keys and values.
 		{`(mapcar 'car (car (send reader :statistics "id")))`,
-			`("row-group" "num-values" "min" "max" "null-count" "distinct-count")`},
-		{`(mapcar 'cdr (car (send reader :statistics "id")))`, `(0 5 0 4 0 nil)`},
+			`("row-group" "shard" "num-values" "min" "max" "null-count" "distinct-count")`},
+		{`(mapcar 'cdr (car (send reader :statistics "id")))`, `(0 0 5 0 4 0 nil)`},
 		{`(equal (parquet-rows reader :list) (send reader :rows :list))`, "t"},
 	} {
 		(&sliptest.Function{Scope: scope, Source: ex.src, Expect: ex.want}).Test(t)

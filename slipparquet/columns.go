@@ -3,8 +3,6 @@
 package slipparquet
 
 import (
-	"context"
-
 	"github.com/ohler55/slip"
 )
 
@@ -44,16 +42,14 @@ type Columns struct {
 // Call the function with the arguments provided.
 func (f *Columns) Call(s *slip.Scope, args slip.List, depth int) slip.Object {
 	slip.CheckArgCount(s, depth, f, args, 1, 1)
-	fr, octets := readerOctets(s, args, depth)
-	schem, err := fr.Schema()
+	sh, octets := readerOctets(s, args, depth)
+	schem, err := sh.first().Schema()
 	if err != nil {
 		panic(err)
 	}
 	columns := make(slip.List, schem.NumFields())
 	for i := 0; i < schem.NumFields(); i++ {
-		if cr, _ := fr.GetColumn(context.Background(), i); cr != nil {
-			columns[i] = readColumn(cr, octets)
-		}
+		columns[i] = readColumn(sh, i, octets)
 	}
 	return columns
 }

@@ -46,5 +46,5 @@ type RowGroupCount struct {
 func (f *RowGroupCount) Call(s *slip.Scope, args slip.List, depth int) slip.Object {
 	slip.CheckArgCount(s, depth, f, args, 1, 1)
 
-	return slip.Fixnum(readerArg(s, args, depth).ParquetReader().NumRowGroups())
+	return slip.Fixnum(readerArg(s, args, depth).rowGroupCount())
 }

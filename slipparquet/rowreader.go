@@ -34,11 +34,25 @@ type keyColReader struct {
 	octets bool
 }
 
+// shardPlan is the part of one shard that a read covers.
+type shardPlan struct {
+	shard  int
+	groups []int // nil for every row group
+	skip   int64
+}
+
 type rowReader struct {
+	sh     *shards
+	ids    slip.Object
+	plan   []shardPlan
+	pi     int // index into plan of the shard being read
 	cra    []*keyColReader
 	format byte
+	octets bool
 	limit  int64 // negative for no limit
 	count  int64
+	depth  int
+	scope  *slip.Scope
 }
 
 func (kcr *keyColReader) next() (value slip.Object, done bool) {
@@ -135,6 +149,37 @@ func rowGroupsFor(pr *file.Reader, offset, limit int64) (groups []int, skip int6
 	return
 }
 
+// rowPlan works out which row groups of which shards hold the rows described
+// by offset and limit. A dataset is read shard by shard in order so a global
+// row number falls in exactly one of them.
+func rowPlan(sh *shards, offset, limit int64) (plan []shardPlan) {
+	if limit == 0 {
+		return
+	}
+	remaining := limit
+	var start int64
+	for i, fr := range sh.frs {
+		cnt := fr.ParquetReader().NumRows()
+		if offset < start+cnt {
+			local := offset - start
+			if local < 0 {
+				local = 0
+			}
+			groups, skip := rowGroupsFor(fr.ParquetReader(), local, remaining)
+			plan = append(plan, shardPlan{shard: i, groups: groups, skip: skip})
+			if 0 <= remaining {
+				if avail := cnt - local; remaining <= avail {
+					break
+				} else {
+					remaining -= avail
+				}
+			}
+		}
+		start += cnt
+	}
+	return
+}
+
 // colReader returns a reader for a field. A nil groups reads every row group
 // which is the path taken when there is no offset or limit.
 func colReader(fr *pqarrow.FileReader, i int, groups []int) *pqarrow.ColumnReader {
@@ -149,12 +194,12 @@ func colReader(fr *pqarrow.FileReader, i int, groups []int) *pqarrow.ColumnReade
 
 func newRowReader(
 	s *slip.Scope,
-	fr *pqarrow.FileReader,
+	sh *shards,
 	ids, format slip.Object,
 	offset, limit int64,
 	octets bool,
 	depth int) *rowReader {
-	rr := rowReader{limit: limit}
+	rr := rowReader{sh: sh, ids: ids, limit: limit, octets: octets, depth: depth, scope: s}
 	switch format {
 	case slip.Symbol(":list"):
 		rr.format = listRow
@@ -163,41 +208,87 @@ func newRowReader(
 	default:
 		slip.TypePanic(s, depth, "format", format, ":list", ":assoc")
 	}
+	// The columns asked for are checked against the schema now so a bad name
+	// is reported even when the plan covers no shards at all.
+	schem, err := sh.first().Schema()
+	if err != nil {
+		panic(err)
+	}
+	if tids, ok := ids.(slip.List); ok {
+		for _, id := range tids {
+			if findColIndex(s, schem, id, depth) < 0 {
+				slip.ErrorPanic(s, depth, "column %s not found", id)
+			}
+		}
+	} else if ids != nil {
+		slip.TypePanic(s, depth, "column-ids", ids, "list", "nil")
+	}
+	rr.plan = rowPlan(sh, offset, limit)
+	rr.openShard()
+
+	return &rr
+}
+
+// openShard builds the column readers for the shard the plan is up to.
+func (rr *rowReader) openShard() {
+	rr.cra = nil
+	if len(rr.plan) <= rr.pi {
+		return
+	}
+	sp := rr.plan[rr.pi]
+	fr := rr.sh.frs[sp.shard]
 	schem, err := fr.Schema()
 	if err != nil {
 		panic(err)
 	}
-	groups, skip := rowGroupsFor(fr.ParquetReader(), offset, limit)
-	switch tids := ids.(type) {
+	switch tids := rr.ids.(type) {
 	case nil:
 		for i := 0; i < schem.NumFields(); i++ {
-			cr := colReader(fr, i, groups)
-			rr.cra = append(rr.cra,
-				&keyColReader{cr: cr, key: schem.Field(i).Name, format: rr.format, octets: octets})
+			rr.cra = append(rr.cra, &keyColReader{
+				cr: colReader(fr, i, sp.groups), key: schem.Field(i).Name,
+				format: rr.format, octets: rr.octets,
+			})
 		}
 	case slip.List:
 		for _, id := range tids {
-			cr, key := findColReader(s, fr, schem, id, groups, depth)
-			if cr == nil {
-				slip.ErrorPanic(s, depth, "column %s not found", id)
+			idx := findColIndex(rr.scope, schem, id, rr.depth)
+			if idx < 0 {
+				slip.ErrorPanic(rr.scope, rr.depth, "column %s not found", id)
 			}
-			rr.cra = append(rr.cra, &keyColReader{cr: cr, key: key, format: rr.format, octets: octets})
+			rr.cra = append(rr.cra, &keyColReader{
+				cr: colReader(fr, idx, sp.groups), key: schem.Field(idx).Name,
+				format: rr.format, octets: rr.octets,
+			})
 		}
-	default:
-		slip.TypePanic(s, depth, "column-ids", ids, "list", "nil")
 	}
-	if 0 < skip {
+	if 0 < sp.skip {
 		for _, kcr := range rr.cra {
-			kcr.skip(skip)
+			kcr.skip(sp.skip)
 		}
 	}
-	return &rr
 }
 
 func (rr *rowReader) next() (row slip.Object) {
-	if 0 <= rr.limit && rr.limit <= rr.count {
-		return
+	for {
+		if 0 <= rr.limit && rr.limit <= rr.count {
+			return
+		}
+		if len(rr.plan) <= rr.pi {
+			return
+		}
+		if row = rr.nextInShard(); row != nil {
+			rr.count++
+			return
+		}
+		// The shard is spent so carry on with the next one in the plan.
+		rr.pi++
+		rr.openShard()
 	}
+}
+
+// nextInShard returns the next row of the shard being read or nil when it has
+// no more rows.
+func (rr *rowReader) nextInShard() (row slip.Object) {
 	switch rr.format {
 	case listRow:
 		rlist := make(slip.List, len(rr.cra))
@@ -220,39 +311,32 @@ func (rr *rowReader) next() (row slip.Object) {
 		}
 		row = alist
 	}
-	if row != nil {
-		rr.count++
+	if len(rr.cra) == 0 {
+		row = nil
 	}
 	return
 }
 
-func findColReader(
-	s *slip.Scope,
-	fr *pqarrow.FileReader,
-	schem *arrow.Schema,
-	id slip.Object,
-	groups []int,
-	depth int) (cr *pqarrow.ColumnReader, name string) {
+// findColIndex returns the field index of a column identified by index or
+// name. A negative result means it was not found.
+func findColIndex(s *slip.Scope, schem *arrow.Schema, id slip.Object, depth int) int {
 	switch tid := id.(type) {
 	case slip.Fixnum:
 		if 0 <= tid && int(tid) < schem.NumFields() {
-			cr = colReader(fr, int(tid), groups)
-			name = schem.Field(int(tid)).Name
+			return int(tid)
 		}
 	case slip.String:
 		if fa := schem.FieldIndices(string(tid)); 0 < len(fa) {
-			cr = colReader(fr, fa[0], groups)
-			name = string(tid)
+			return fa[0]
 		}
 	case slip.Symbol:
 		if fa := schem.FieldIndices(string(tid)); 0 < len(fa) {
-			cr = colReader(fr, fa[0], groups)
-			name = string(tid)
+			return fa[0]
 		}
 	default:
 		slip.TypePanic(s, depth, "id", tid, "fixnum", "string", "symbol")
 	}
-	return
+	return -1
 }
 
 // ArrayValue returns a value in an arrow.Array. The validity of the index is
@@ -485,8 +569,8 @@ func parseRowOpts(s *slip.Scope, args slip.List, depth int) (ids slip.Object, of
 }
 
 // rowCap is the capacity to allocate for a row list.
-func rowCap(fr *pqarrow.FileReader, limit int64) int64 {
-	cnt := fr.ParquetReader().NumRows()
+func rowCap(sh *shards, limit int64) int64 {
+	cnt := sh.rowCount()
 	if 0 <= limit && limit < cnt {
 		return limit
 	}

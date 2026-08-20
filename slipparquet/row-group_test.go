@@ -62,7 +62,7 @@ func TestRowGroupInfoOk(t *testing.T) {
 	(&sliptest.Function{
 		Scope:  scope,
 		Source: `(mapcar 'car (parquet-row-group-info reader 0))`,
-		Expect: `("rows" "columns" "byte-size" "compressed-size")`,
+		Expect: `("shard" "rows" "columns" "byte-size" "compressed-size")`,
 	}).Test(t)
 	(&sliptest.Function{
 		Scope:  scope,

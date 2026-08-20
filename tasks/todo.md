@@ -245,7 +245,7 @@ Decimal32/64/128/256 cases; `context` plumbing for cancellation.
 
 Taken from the Out of scope list above, in the order asked for.
 
-## 10. Multi-shard datasets
+## 10. Multi-shard datasets — DONE
 
 A HuggingFace split is a list of shard URLs, not one file. Open a list and
 treat it as one logical table.
@@ -271,9 +271,23 @@ Aggregation rules:
 Shards must share a schema. A mismatch is an error at open rather than a
 confusing read later.
 
-*Verify:* the same rows come back from one 15 row file as from three 5 row
-shards; offset and limit spanning a shard boundary match a full read; schema
-mismatch raises; close closes every shard.
+*Verified:* 13 tests. New fixtures `shard-0/1/2.parquet` hold exactly the same
+15 rows as `multi-group.parquet`, so the two are compared directly:
+`TestShardsPagingMatchesSingleFile` checks all 289 offset/limit combinations
+from 0..16 against the single file and `TestShardsRowsMatchSingleFile` checks
+`:rows` in both formats, `:column`, and `:columns`. Schema mismatch, an empty
+list, a non-string entry, and a missing shard all raise. Live test opens the
+two shards of the wikitext-103 train split and confirms the dataset row count
+is the sum of the shards read alone, that the tail of shard 0 runs into shard
+1, and that row groups past the first report `shard` 1.
+
+The `*shards` refactor also finished the `readerArg` cleanup that was left over
+from phase 1 — all 21 `inst.Any.(*pqarrow.FileReader)` assertions are gone and
+the six function files that still unwrapped inline now use the helper.
+
+**API change:** `parquet-row-group-info` and `parquet-statistics` gained a
+`shard` key, and row group numbers now run across the dataset rather than
+within a file. Tests, doc strings, and the README were updated together.
 
 ## 11. Dictionary column fast path
 

@@ -100,6 +100,28 @@ network. Set the `HF_TOKEN` environment variable to reach a gated or
 private HuggingFace dataset. The token is only ever sent to
 `huggingface.co` and never to any other host.
 
+### Datasets split into shards
+
+A dataset is often stored as several files rather than one. A HuggingFace
+split is a list of shard URLs. Pass the list and the reader presents them
+as a single table: row counts are summed, rows are read shard by shard in
+order, and paging spans the boundaries between them.
+
+```lisp
+(setq reader (parquet-open '("part-0.parquet" "part-1.parquet" "part-2.parquet")))
+
+(send reader :row-count)  ;; the total across all three
+
+(send reader :rows :list '("id") :offset 3 :limit 4)
+;; => ((3) (4) (5) (6))   ;; spans the first and second shard
+```
+
+The schema, version, created-by, and metadata come from the first shard.
+Every shard must have the same schema; opening a list whose shards
+disagree is an error rather than a confusing read later. Row groups are
+numbered across the whole dataset and each reports the `shard` it came
+from.
+
 ### Looking before reading
 
 Row group information and column statistics come from the file footer so
@@ -111,10 +133,11 @@ and both work the same on a remote file.
 ;; => 3
 
 (send reader :row-group-info 1)
-;; => (("rows" . 5) ("columns" . 2) ("byte-size" . 188) ("compressed-size" . 188))
+;; => (("shard" . 0) ("rows" . 5) ("columns" . 2) ("byte-size" . 188)
+;;     ("compressed-size" . 188))
 
 (send reader :statistics "id")
-;; => ((("row-group" . 0) ("num-values" . 5) ("min" . 0) ("max" . 4)
+;; => ((("row-group" . 0) ("shard" . 0) ("num-values" . 5) ("min" . 0) ("max" . 4)
 ;;      ("null-count" . 0) ("distinct-count" . nil))
 ;;     ...)
 ```

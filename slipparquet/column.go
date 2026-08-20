@@ -47,13 +47,13 @@ type Column struct {
 // Call the function with the arguments provided.
 func (f *Column) Call(s *slip.Scope, args slip.List, depth int) (result slip.Object) {
 	slip.CheckArgCount(s, depth, f, args, 2, 2)
-	fr, octets := readerOctets(s, args, depth)
-	schem, err := fr.Schema()
+	sh, octets := readerOctets(s, args, depth)
+	schem, err := sh.first().Schema()
 	if err != nil {
 		panic(err)
 	}
-	if cr, _ := findColReader(s, fr, schem, args[1], nil, depth); cr != nil {
-		result = readColumn(cr, octets)
+	if idx := findColIndex(s, schem, args[1], depth); 0 <= idx {
+		result = readColumn(sh, idx, octets)
 	}
 	return
 }

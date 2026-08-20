@@ -76,7 +76,7 @@ func TestStatisticsAbsent(t *testing.T) {
 	(&sliptest.Function{
 		Scope:  scope,
 		Source: `(mapcar 'car (car (parquet-statistics reader "id")))`,
-		Expect: `("row-group" "num-values")`,
+		Expect: `("row-group" "shard" "num-values")`,
 	}).Test(t)
 	(&sliptest.Function{
 		Scope:  scope,

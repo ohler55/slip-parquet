@@ -6,16 +6,14 @@ import (
 	"strings"
 
 	"github.com/apache/arrow-go/v18/parquet/metadata"
-	"github.com/apache/arrow-go/v18/parquet/pqarrow"
 	"github.com/apache/arrow-go/v18/parquet/schema"
 	"github.com/ohler55/slip"
-	"github.com/ohler55/slip/pkg/flavors"
 )
 
 const statsDoc = `Statistics are optional in a parquet file. Older writers and some columns
 carry none in which case _min_ and _max_ are nil. Statistics are recorded per column chunk so
-there is one entry for each row group. The keys are _row-group_, _min_, _max_, _null-count_,
-_distinct-count_, and _num-values_.
+there is one entry for each row group. The keys are _row-group_, _shard_, _min_, _max_,
+_null-count_, _distinct-count_, and _num-values_.
 
 Statistics are kept for the leaf columns of the file so a nested column is identified by its
 dotted path such as _st.a_ rather than by the name of the struct that holds it.
@@ -119,36 +117,21 @@ func pick[T any](minVal, maxVal T, want bool) T {
 	return minVal
 }
 
-// statsFor returns the per row group statistics of one leaf column.
-func statsFor(fr *pqarrow.FileReader, col int) slip.Object {
-	pr := fr.ParquetReader()
-	stats := make(slip.List, 0, pr.NumRowGroups())
-	for i := 0; i < pr.NumRowGroups(); i++ {
-		cc, err := pr.MetaData().RowGroup(i).ColumnChunk(col)
-		if err != nil {
-			continue
-		}
-		entry := slip.List{
-			slip.List{slip.String("row-group"), slip.Tail{Value: slip.Fixnum(i)}},
-			slip.List{slip.String("num-values"), slip.Tail{Value: slip.Fixnum(cc.NumValues())}},
-		}
-		st, err := cc.Statistics()
-		if err == nil && st != nil {
-			var nulls, distinct slip.Object
-			if st.HasNullCount() {
-				nulls = slip.Fixnum(st.NullCount())
+// statsFor returns the per row group statistics of one leaf column. Row groups
+// are numbered across the whole dataset so a column of a three shard dataset
+// reports the row groups of all three in order.
+func statsFor(sh *shards, col int) slip.Object {
+	stats := make(slip.List, 0, sh.rowGroupCount())
+	num := 0
+	for shard, fr := range sh.frs {
+		pr := fr.ParquetReader()
+		for i := 0; i < pr.NumRowGroups(); i++ {
+			entry := statsEntry(pr.MetaData().RowGroup(i), col, num, shard)
+			num++
+			if entry != nil {
+				stats = append(stats, entry)
 			}
-			if st.HasDistinctCount() {
-				distinct = slip.Fixnum(st.DistinctCount())
-			}
-			entry = append(entry,
-				slip.List{slip.String("min"), slip.Tail{Value: statNum(st, false)}},
-				slip.List{slip.String("max"), slip.Tail{Value: statNum(st, true)}},
-				slip.List{slip.String("null-count"), slip.Tail{Value: nulls}},
-				slip.List{slip.String("distinct-count"), slip.Tail{Value: distinct}},
-			)
 		}
-		stats = append(stats, entry)
 	}
 	if len(stats) == 0 {
 		return nil
@@ -156,16 +139,46 @@ func statsFor(fr *pqarrow.FileReader, col int) slip.Object {
 	return stats
 }
 
+// statsEntry is the statistics of one column chunk.
+func statsEntry(rg *metadata.RowGroupMetaData, col, num, shard int) slip.Object {
+	cc, err := rg.ColumnChunk(col)
+	if err != nil {
+		return nil
+	}
+	entry := slip.List{
+		slip.List{slip.String("row-group"), slip.Tail{Value: slip.Fixnum(num)}},
+		slip.List{slip.String("shard"), slip.Tail{Value: slip.Fixnum(shard)}},
+		slip.List{slip.String("num-values"), slip.Tail{Value: slip.Fixnum(cc.NumValues())}},
+	}
+	st, err := cc.Statistics()
+	if err == nil && st != nil {
+		var nulls, distinct slip.Object
+		if st.HasNullCount() {
+			nulls = slip.Fixnum(st.NullCount())
+		}
+		if st.HasDistinctCount() {
+			distinct = slip.Fixnum(st.DistinctCount())
+		}
+		entry = append(entry,
+			slip.List{slip.String("min"), slip.Tail{Value: statNum(st, false)}},
+			slip.List{slip.String("max"), slip.Tail{Value: statNum(st, true)}},
+			slip.List{slip.String("null-count"), slip.Tail{Value: nulls}},
+			slip.List{slip.String("distinct-count"), slip.Tail{Value: distinct}},
+		)
+	}
+	return entry
+}
+
 // columnStats returns the statistics of one column or, when no column is
 // named, of every column keyed by column path.
-func columnStats(s *slip.Scope, fr *pqarrow.FileReader, id slip.Object, depth int) slip.Object {
-	sc := fr.ParquetReader().MetaData().Schema
+func columnStats(s *slip.Scope, sh *shards, id slip.Object, depth int) slip.Object {
+	sc := sh.first().ParquetReader().MetaData().Schema
 	if id == nil {
 		all := make(slip.List, 0, sc.NumColumns())
 		for i := 0; i < sc.NumColumns(); i++ {
 			all = append(all, slip.List{
 				slip.String(sc.Column(i).Path()),
-				slip.Tail{Value: statsFor(fr, i)},
+				slip.Tail{Value: statsFor(sh, i)},
 			})
 		}
 		if len(all) == 0 {
@@ -177,7 +190,7 @@ func columnStats(s *slip.Scope, fr *pqarrow.FileReader, id slip.Object, depth in
 	if col < 0 {
 		slip.ErrorPanic(s, depth, "column %s not found", id)
 	}
-	return statsFor(fr, col)
+	return statsFor(sh, col)
 }
 
 // findLeafColumn returns the index of a leaf column identified by index, path,
@@ -222,7 +235,7 @@ func findLeafColumn(s *slip.Scope, sc *schema.Schema, id slip.Object, depth int)
 type readerStatisticsCaller bool
 
 func (caller readerStatisticsCaller) Call(s *slip.Scope, args slip.List, depth int) (result slip.Object) {
-	obj := s.Get("self").(*flavors.Instance)
+	obj, sh := selfShards(s)
 	if 1 < len(args) {
 		slip.MethodArgChoicePanic(s, depth, obj, ":statistics", len(args), "0 or 1")
 	}
@@ -230,8 +243,8 @@ func (caller readerStatisticsCaller) Call(s *slip.Scope, args slip.List, depth i
 	if 0 < len(args) {
 		id = args[0]
 	}
-	if fr, ok := obj.Any.(*pqarrow.FileReader); ok {
-		result = columnStats(s, fr, id, depth)
+	if sh != nil {
+		result = columnStats(s, sh, id, depth)
 	}
 	return
 }

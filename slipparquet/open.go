@@ -5,6 +5,7 @@ package slipparquet
 import (
 	"strings"
 
+	"github.com/apache/arrow-go/v18/arrow"
 	"github.com/apache/arrow-go/v18/arrow/memory"
 	"github.com/apache/arrow-go/v18/parquet/file"
 	"github.com/apache/arrow-go/v18/parquet/pqarrow"
@@ -68,10 +69,7 @@ type Open struct {
 // Call the function with the arguments provided.
 func (f *Open) Call(s *slip.Scope, args slip.List, depth int) slip.Object {
 	slip.CheckArgCount(s, depth, f, args, 1, 3)
-	path, ok := args[0].(slip.String)
-	if !ok {
-		slip.TypePanic(s, depth, "file", args[0], "string")
-	}
+	paths := pathsArg(s, args[0], "file", depth)
 	var binaryAs slip.Object
 	for i := 1; i < len(args); i += 2 {
 		sym, _ := args[i].(slip.Symbol)
@@ -84,14 +82,46 @@ func (f *Open) Call(s *slip.Scope, args slip.List, depth int) slip.Object {
 		binaryAs = binaryAsArg(s, args[i+1], depth)
 	}
 	inst := readerFlavor.MakeInstance().(*flavors.Instance)
-	initReader(s, inst, string(path), binaryAs, depth)
+	initReader(s, inst, paths, binaryAs, depth)
 
 	return inst
 }
 
-// initReader opens either a local file or, if the path is an HTTP or HTTPS
-// URL, a remote file read with range requests.
-func initReader(s *slip.Scope, inst *flavors.Instance, path string, binaryAs slip.Object, depth int) {
+// initReader opens the files of a reader. Each is either a local file or, if
+// the path is an HTTP or HTTPS URL, a remote file read with range requests.
+func initReader(s *slip.Scope, inst *flavors.Instance, paths []string, binaryAs slip.Object, depth int) {
+	if len(paths) == 0 {
+		slip.ErrorPanic(s, depth, "no parquet file to open")
+	}
+	sh := shards{paths: paths}
+	for _, path := range paths {
+		sh.frs = append(sh.frs, openOne(s, path, depth))
+	}
+	// Rows from shards that do not agree on a schema can not be put in the
+	// same table so the mismatch is caught here rather than mid read.
+	base, err := sh.first().Schema()
+	if err != nil {
+		slip.FilePanic(s, depth, slip.String(paths[0]), "%s", err)
+	}
+	for i := 1; i < len(sh.frs); i++ {
+		var sc *arrow.Schema
+		if sc, err = sh.frs[i].Schema(); err != nil {
+			slip.FilePanic(s, depth, slip.String(paths[i]), "%s", err)
+		}
+		if !sameSchema(base, sc) {
+			sh.close()
+			slip.ErrorPanic(s, depth, "%s does not have the same schema as %s", paths[i], paths[0])
+		}
+	}
+	inst.Any = &sh
+	inst.Let(slip.Symbol("filepath"), sh.filepath())
+	if binaryAs != nil {
+		inst.Let(slip.Symbol("binary-as"), binaryAs)
+	}
+}
+
+// openOne opens a single parquet file.
+func openOne(s *slip.Scope, path string, depth int) *pqarrow.FileReader {
 	var (
 		pr  *file.Reader
 		err error
@@ -111,9 +141,27 @@ func initReader(s *slip.Scope, inst *flavors.Instance, path string, binaryAs sli
 	if err != nil {
 		slip.FilePanic(s, depth, slip.String(path), "%s", err)
 	}
-	inst.Any = fr
-	inst.Let(slip.Symbol("filepath"), slip.String(path))
-	if binaryAs != nil {
-		inst.Let(slip.Symbol("binary-as"), binaryAs)
+	return fr
+}
+
+// pathsArg accepts either a single file or a list of the files that make up a
+// dataset.
+func pathsArg(s *slip.Scope, obj slip.Object, use string, depth int) []string {
+	switch tv := obj.(type) {
+	case slip.String:
+		return []string{string(tv)}
+	case slip.List:
+		paths := make([]string, len(tv))
+		for i, v := range tv {
+			ss, ok := v.(slip.String)
+			if !ok {
+				slip.TypePanic(s, depth, use, v, "string")
+			}
+			paths[i] = string(ss)
+		}
+		return paths
 	}
+	slip.TypePanic(s, depth, use, obj, "string", "list")
+
+	return nil
 }

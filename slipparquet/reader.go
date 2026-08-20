@@ -6,7 +6,6 @@ import (
 	"context"
 	"strings"
 
-	"github.com/apache/arrow-go/v18/parquet/pqarrow"
 	"github.com/ohler55/slip"
 	"github.com/ohler55/slip/pkg/cl"
 	"github.com/ohler55/slip/pkg/flavors"
@@ -66,7 +65,7 @@ func (caller readerInitCaller) Call(s *slip.Scope, args slip.List, depth int) sl
 		args = args[0].(slip.List)
 	}
 	var (
-		path     string
+		paths    []string
 		binaryAs slip.Object
 	)
 	for i := 0; i < len(args); i += 2 {
@@ -74,11 +73,7 @@ func (caller readerInitCaller) Call(s *slip.Scope, args slip.List, depth int) sl
 		k := string(key)
 		switch {
 		case strings.EqualFold(":file", k):
-			ss, ok := args[i+1].(slip.String)
-			if !ok {
-				slip.TypePanic(s, depth, ":file", args[i+1], "string")
-			}
-			path = string(ss)
+			paths = pathsArg(s, args[i+1], ":file", depth)
 		case strings.EqualFold(":binary-as", k):
 			binaryAs = args[i+1]
 		}
@@ -89,7 +84,7 @@ func (caller readerInitCaller) Call(s *slip.Scope, args slip.List, depth int) sl
 	if binaryAs == nil {
 		binaryAs = obj.Get("binary-as")
 	}
-	initReader(s, obj, path, binaryAsArg(s, binaryAs, depth), depth)
+	initReader(s, obj, paths, binaryAsArg(s, binaryAs, depth), depth)
 
 	return nil
 }
@@ -124,9 +119,8 @@ other binary payload.`,
 type readerCloseCaller bool
 
 func (caller readerCloseCaller) Call(s *slip.Scope, args slip.List, _ int) slip.Object {
-	obj := s.Get("self").(*flavors.Instance)
-	if fr, ok := obj.Any.(*pqarrow.FileReader); ok {
-		_ = fr.ParquetReader().Close()
+	if _, sh := selfShards(s); sh != nil {
+		sh.close()
 	}
 	return nil
 }
@@ -141,9 +135,8 @@ func (caller readerCloseCaller) FuncDocs() *slip.FuncDoc {
 type readerVersionCaller bool
 
 func (caller readerVersionCaller) Call(s *slip.Scope, args slip.List, _ int) (result slip.Object) {
-	obj := s.Get("self").(*flavors.Instance)
-	if fr, ok := obj.Any.(*pqarrow.FileReader); ok {
-		result = slip.String(fr.ParquetReader().MetaData().Version().String())
+	if _, sh := selfShards(s); sh != nil {
+		result = slip.String(sh.first().ParquetReader().MetaData().Version().String())
 	}
 	return
 }
@@ -159,9 +152,8 @@ func (caller readerVersionCaller) FuncDocs() *slip.FuncDoc {
 type readerCreatedByCaller bool
 
 func (caller readerCreatedByCaller) Call(s *slip.Scope, args slip.List, _ int) (result slip.Object) {
-	obj := s.Get("self").(*flavors.Instance)
-	if fr, ok := obj.Any.(*pqarrow.FileReader); ok {
-		result = slip.String(fr.ParquetReader().MetaData().GetCreatedBy())
+	if _, sh := selfShards(s); sh != nil {
+		result = slip.String(sh.first().ParquetReader().MetaData().GetCreatedBy())
 	}
 	return
 }
@@ -177,9 +169,8 @@ func (caller readerCreatedByCaller) FuncDocs() *slip.FuncDoc {
 type readerRowCountCaller bool
 
 func (caller readerRowCountCaller) Call(s *slip.Scope, args slip.List, _ int) (result slip.Object) {
-	obj := s.Get("self").(*flavors.Instance)
-	if fr, ok := obj.Any.(*pqarrow.FileReader); ok {
-		result = slip.Fixnum(fr.ParquetReader().NumRows())
+	if _, sh := selfShards(s); sh != nil {
+		result = slip.Fixnum(sh.rowCount())
 	}
 	return
 }
@@ -195,9 +186,8 @@ func (caller readerRowCountCaller) FuncDocs() *slip.FuncDoc {
 type readerMetadataCaller bool
 
 func (caller readerMetadataCaller) Call(s *slip.Scope, args slip.List, _ int) (result slip.Object) {
-	obj := s.Get("self").(*flavors.Instance)
-	if fr, ok := obj.Any.(*pqarrow.FileReader); ok {
-		result = fileMetadata(fr)
+	if _, sh := selfShards(s); sh != nil {
+		result = fileMetadata(sh)
 	}
 	return
 }
@@ -221,9 +211,8 @@ Returns nil when the file has no key-value metadata.`,
 type readerRowGroupCountCaller bool
 
 func (caller readerRowGroupCountCaller) Call(s *slip.Scope, args slip.List, _ int) (result slip.Object) {
-	obj := s.Get("self").(*flavors.Instance)
-	if fr, ok := obj.Any.(*pqarrow.FileReader); ok {
-		result = slip.Fixnum(fr.ParquetReader().NumRowGroups())
+	if _, sh := selfShards(s); sh != nil {
+		result = slip.Fixnum(sh.rowGroupCount())
 	}
 	return
 }
@@ -242,12 +231,12 @@ in so they are a convenient way to step through a large file a chunk at a time.`
 type readerRowGroupInfoCaller bool
 
 func (caller readerRowGroupInfoCaller) Call(s *slip.Scope, args slip.List, depth int) (result slip.Object) {
-	obj := s.Get("self").(*flavors.Instance)
+	obj, sh := selfShards(s)
 	if len(args) != 1 {
 		slip.MethodArgChoicePanic(s, depth, obj, ":row-group-info", len(args), "1")
 	}
-	if fr, ok := obj.Any.(*pqarrow.FileReader); ok {
-		result = rowGroupInfo(s, fr, args[0], depth)
+	if sh != nil {
+		result = rowGroupInfo(s, sh, args[0], depth)
 	}
 	return
 }
@@ -257,8 +246,8 @@ func (caller readerRowGroupInfoCaller) FuncDocs() *slip.FuncDoc {
 		Name: ":row-group-info",
 		Text: `Returns information about one row group as an assoc list.
 
-The keys are _rows_, _columns_, _byte-size_, and _compressed-size_. Since this comes from the
-file metadata none of the row group data is read.`,
+The keys are _shard_, _rows_, _columns_, _byte-size_, and _compressed-size_. Since this comes
+from the file metadata none of the row group data is read.`,
 		Args: []*slip.DocArg{
 			{
 				Name: "index",
@@ -273,9 +262,8 @@ file metadata none of the row group data is read.`,
 type readerColumnCountCaller bool
 
 func (caller readerColumnCountCaller) Call(s *slip.Scope, args slip.List, _ int) (result slip.Object) {
-	obj := s.Get("self").(*flavors.Instance)
-	if fr, ok := obj.Any.(*pqarrow.FileReader); ok {
-		sch, err := fr.Schema()
+	if _, sh := selfShards(s); sh != nil {
+		sch, err := sh.first().Schema()
 		if err != nil {
 			panic(err)
 		}
@@ -295,9 +283,8 @@ func (caller readerColumnCountCaller) FuncDocs() *slip.FuncDoc {
 type readerSchemaCaller bool
 
 func (caller readerSchemaCaller) Call(s *slip.Scope, args slip.List, _ int) (result slip.Object) {
-	obj := s.Get("self").(*flavors.Instance)
-	if fr, ok := obj.Any.(*pqarrow.FileReader); ok {
-		result = makeSchemaInstance(fr.ParquetReader().MetaData().Schema.Root())
+	if _, sh := selfShards(s); sh != nil {
+		result = makeSchemaInstance(sh.first().ParquetReader().MetaData().Schema.Root())
 	}
 	return
 }
@@ -313,17 +300,15 @@ func (caller readerSchemaCaller) FuncDocs() *slip.FuncDoc {
 type readerColumnsCaller bool
 
 func (caller readerColumnsCaller) Call(s *slip.Scope, args slip.List, _ int) (result slip.Object) {
-	obj := s.Get("self").(*flavors.Instance)
-	if fr, ok := obj.Any.(*pqarrow.FileReader); ok {
-		schem, err := fr.Schema()
+	obj, sh := selfShards(s)
+	if sh != nil {
+		schem, err := sh.first().Schema()
 		if err != nil {
 			panic(err)
 		}
 		columns := make(slip.List, schem.NumFields())
 		for i := 0; i < schem.NumFields(); i++ {
-			if cr, _ := fr.GetColumn(context.Background(), i); cr != nil {
-				columns[i] = readColumn(cr, isOctets(obj))
-			}
+			columns[i] = readColumn(sh, i, isOctets(obj))
 		}
 		result = columns
 	}
@@ -341,17 +326,17 @@ func (caller readerColumnsCaller) FuncDocs() *slip.FuncDoc {
 type readerColumnCaller bool
 
 func (caller readerColumnCaller) Call(s *slip.Scope, args slip.List, depth int) (result slip.Object) {
-	obj := s.Get("self").(*flavors.Instance)
+	obj, sh := selfShards(s)
 	if len(args) != 1 {
 		slip.MethodArgChoicePanic(s, depth, obj, ":column", len(args), "1")
 	}
-	if fr, ok := obj.Any.(*pqarrow.FileReader); ok {
-		schem, err := fr.Schema()
+	if sh != nil {
+		schem, err := sh.first().Schema()
 		if err != nil {
 			panic(err)
 		}
-		if cr, _ := findColReader(s, fr, schem, args[0], nil, depth); cr != nil {
-			result = readColumn(cr, isOctets(obj))
+		if idx := findColIndex(s, schem, args[0], depth); 0 <= idx {
+			result = readColumn(sh, idx, isOctets(obj))
 		}
 	}
 	return
@@ -373,11 +358,11 @@ func (caller readerColumnCaller) FuncDocs() *slip.FuncDoc {
 }
 
 func (caller readerRowsCaller) Call(s *slip.Scope, args slip.List, depth int) (result slip.Object) {
-	obj := s.Get("self").(*flavors.Instance)
-	if fr, ok := obj.Any.(*pqarrow.FileReader); ok {
+	obj, sh := selfShards(s)
+	if sh != nil {
 		ids, offset, limit := parseRowOpts(s, args[1:], depth)
-		rows := make(slip.List, 0, rowCap(fr, limit))
-		rr := newRowReader(s, fr, ids, args[0], offset, limit, isOctets(obj), depth)
+		rows := make(slip.List, 0, rowCap(sh, limit))
+		rr := newRowReader(s, sh, ids, args[0], offset, limit, isOctets(obj), depth)
 		for {
 			row := rr.next()
 			if row == nil {
@@ -430,12 +415,12 @@ or remote file does not read the whole file.`,
 type readerEachRowCaller bool
 
 func (caller readerEachRowCaller) Call(s *slip.Scope, args slip.List, depth int) slip.Object {
-	obj := s.Get("self").(*flavors.Instance)
+	obj, sh := selfShards(s)
 	d2 := depth + 1
 	fun := cl.ResolveToCaller(s, args[0], d2)
-	if fr, ok := obj.Any.(*pqarrow.FileReader); ok {
+	if sh != nil {
 		ids, offset, limit := parseRowOpts(s, args[2:], depth)
-		rr := newRowReader(s, fr, ids, args[1], offset, limit, isOctets(obj), depth)
+		rr := newRowReader(s, sh, ids, args[1], offset, limit, isOctets(obj), depth)
 		for {
 			row := rr.next()
 			if row == nil {
@@ -492,19 +477,27 @@ or remote file does not read the whole file.`,
 	}
 }
 
-func readColumn(cr *pqarrow.ColumnReader, octets bool) (result slip.List) {
-	for {
-		ac, err := cr.NextBatch(batchSize) // *arrow.Chunked
-		if err != nil {
-			panic(err)
+// readColumn reads one column across every shard. The values of a dataset
+// column are the values of that column in each shard in order.
+func readColumn(sh *shards, idx int, octets bool) (result slip.List) {
+	for _, fr := range sh.frs {
+		cr, _ := fr.GetColumn(context.Background(), idx)
+		if cr == nil {
+			continue
 		}
-		if ac.Len() == 0 {
-			break
-		}
-		for _, chunk := range ac.Chunks() {
-			cnt := chunk.Len()
-			for i := 0; i < cnt; i++ {
-				result = append(result, arrayValue(chunk, i, octets))
+		for {
+			ac, err := cr.NextBatch(batchSize) // *arrow.Chunked
+			if err != nil {
+				panic(err)
+			}
+			if ac.Len() == 0 {
+				break
+			}
+			for _, chunk := range ac.Chunks() {
+				cnt := chunk.Len()
+				for i := 0; i < cnt; i++ {
+					result = append(result, arrayValue(chunk, i, octets))
+				}
 			}
 		}
 	}

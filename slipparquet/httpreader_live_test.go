@@ -22,6 +22,10 @@ import (
 
 const imdbURL = "https://huggingface.co/api/datasets/stanfordnlp/imdb/parquet/plain_text/train/0.parquet"
 
+// The wikitext-103 train split is served as two shards which is the normal
+// shape of a HuggingFace dataset.
+const wikitextBase = "https://huggingface.co/api/datasets/Salesforce/wikitext/parquet/wikitext-103-raw-v1/train/"
+
 func TestLiveHuggingFace(t *testing.T) {
 	r, err := newHTTPReader(imdbURL)
 	tt.Nil(t, err)
@@ -145,6 +149,56 @@ func TestLiveHuggingFaceStatistics(t *testing.T) {
 	(&sliptest.Function{
 		Scope:  scope,
 		Source: `(cdr (assoc "min" (car (last (send reader :statistics "label")))))`,
+		Expect: "1",
+	}).Test(t)
+}
+
+// A real HuggingFace split read as one table. The row count of the dataset has
+// to be the sum of the shards read on their own.
+func TestLiveHuggingFaceShards(t *testing.T) {
+	scope := slip.NewScope()
+	scope.Let("reader", nil)
+	scope.Let("a", nil)
+	scope.Let("b", nil)
+	_ = slip.ReadString(fmt.Sprintf(
+		`(setq reader (parquet-open '("%s0.parquet" "%s1.parquet")))`,
+		wikitextBase, wikitextBase), scope).Eval(scope, nil)
+	_ = slip.ReadString(fmt.Sprintf(`(setq a (parquet-open "%s0.parquet"))`, wikitextBase), scope).Eval(scope, nil)
+	_ = slip.ReadString(fmt.Sprintf(`(setq b (parquet-open "%s1.parquet"))`, wikitextBase), scope).Eval(scope, nil)
+	defer func() {
+		for _, v := range []string{"reader", "a", "b"} {
+			_ = slip.ReadString("(send "+v+" :close)", scope).Eval(scope, nil)
+		}
+	}()
+
+	(&sliptest.Function{
+		Scope:  scope,
+		Source: `(= (send reader :row-count) (+ (send a :row-count) (send b :row-count)))`,
+		Expect: "t",
+	}).Test(t)
+	(&sliptest.Function{
+		Scope: scope,
+		Source: `(= (send reader :row-group-count)
+                    (+ (send a :row-group-count) (send b :row-group-count)))`,
+		Expect: "t",
+	}).Test(t)
+	// The first rows of the dataset are the first rows of the first shard.
+	(&sliptest.Function{
+		Scope:  scope,
+		Source: `(equal (send reader :rows :list :limit 3) (send a :rows :list :limit 3))`,
+		Expect: "t",
+	}).Test(t)
+	// Reading past the end of the first shard lands in the second one.
+	(&sliptest.Function{
+		Scope: scope,
+		Source: `(equal (send reader :rows :list :offset (send a :row-count) :limit 3)
+                        (send b :rows :list :limit 3))`,
+		Expect: "t",
+	}).Test(t)
+	// Row groups past the first shard report the second shard.
+	(&sliptest.Function{
+		Scope:  scope,
+		Source: `(cdr (assoc "shard" (send reader :row-group-info (send a :row-group-count))))`,
 		Expect: "1",
 	}).Test(t)
 }

@@ -3,7 +3,6 @@
 package slipparquet
 
 import (
-	"github.com/apache/arrow-go/v18/parquet/pqarrow"
 	"github.com/ohler55/slip"
 	"github.com/ohler55/slip/pkg/flavors"
 )
@@ -34,34 +33,37 @@ func init() {
 	slip.UserPkg.Use(&Pkg)
 }
 
-// readerArg returns the file reader held by the first argument which must be a
+// readerArg returns the shards held by the first argument which must be a
 // parquet-reader-flavor instance.
-func readerArg(s *slip.Scope, args slip.List, depth int) *pqarrow.FileReader {
+func readerArg(s *slip.Scope, args slip.List, depth int) *shards {
 	inst, ok := args[0].(*flavors.Instance)
 	if !ok {
 		slip.TypePanic(s, depth, "reader", args[0], "parquet-reader-flavor instance")
 	}
-	var fr *pqarrow.FileReader
-	if fr, ok = inst.Any.(*pqarrow.FileReader); !ok {
+	sh := readerShards(inst)
+	if sh == nil {
 		slip.TypePanic(s, depth, "reader", args[0], "parquet-reader-flavor instance")
 	}
-	return fr
+	return sh
 }
 
 // rowGroupInfo returns the metadata for a row group as an assoc list. The
 // index is checked against the number of row groups in the file.
-func rowGroupInfo(s *slip.Scope, fr *pqarrow.FileReader, id slip.Object, depth int) slip.Object {
+func rowGroupInfo(s *slip.Scope, sh *shards, id slip.Object, depth int) slip.Object {
 	num, ok := id.(slip.Fixnum)
 	if !ok {
 		slip.TypePanic(s, depth, "index", id, "fixnum")
 	}
-	pr := fr.ParquetReader()
-	if num < 0 || slip.Fixnum(pr.NumRowGroups()) <= num {
-		slip.ErrorPanic(s, depth, "row group %d is not in the range 0 to %d", num, pr.NumRowGroups()-1)
+	// Row groups are numbered across the whole dataset so the index has to be
+	// mapped onto the shard holding it.
+	shard, local := sh.rowGroup(int(num))
+	if shard < 0 {
+		slip.ErrorPanic(s, depth, "row group %d is not in the range 0 to %d", num, sh.rowGroupCount()-1)
 	}
-	rg := pr.MetaData().RowGroup(int(num))
+	rg := sh.frs[shard].ParquetReader().MetaData().RowGroup(local)
 
 	return slip.List{
+		slip.List{slip.String("shard"), slip.Tail{Value: slip.Fixnum(shard)}},
 		slip.List{slip.String("rows"), slip.Tail{Value: slip.Fixnum(rg.NumRows())}},
 		slip.List{slip.String("columns"), slip.Tail{Value: slip.Fixnum(rg.NumColumns())}},
 		slip.List{slip.String("byte-size"), slip.Tail{Value: slip.Fixnum(rg.TotalByteSize())}},
@@ -74,8 +76,8 @@ func rowGroupInfo(s *slip.Scope, fr *pqarrow.FileReader, id slip.Object, depth i
 // The metadata is a map of strings that any writer can put in the file footer.
 // Spark stores its SQL schema there, Arrow stores a serialized schema, and
 // HuggingFace stores the dataset feature spec including the class label names.
-func fileMetadata(fr *pqarrow.FileReader) slip.Object {
-	kv := fr.ParquetReader().MetaData().KeyValueMetadata()
+func fileMetadata(sh *shards) slip.Object {
+	kv := sh.first().ParquetReader().MetaData().KeyValueMetadata()
 	meta := make(slip.List, 0, kv.Len())
 	for _, key := range kv.Keys() {
 		var val slip.Object
@@ -98,11 +100,11 @@ func isOctets(inst *flavors.Instance) bool {
 
 // readerOctets returns the file reader held by the first argument along with
 // how that reader represents binary values.
-func readerOctets(s *slip.Scope, args slip.List, depth int) (*pqarrow.FileReader, bool) {
-	fr := readerArg(s, args, depth)
+func readerOctets(s *slip.Scope, args slip.List, depth int) (*shards, bool) {
+	sh := readerArg(s, args, depth)
 	inst, _ := args[0].(*flavors.Instance)
 
-	return fr, isOctets(inst)
+	return sh, isOctets(inst)
 }
 
 // binaryAsArg checks a :binary-as value and returns it.

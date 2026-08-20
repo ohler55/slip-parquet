@@ -3,9 +3,7 @@
 package slipparquet
 
 import (
-	"github.com/apache/arrow-go/v18/parquet/pqarrow"
 	"github.com/ohler55/slip"
-	"github.com/ohler55/slip/pkg/flavors"
 )
 
 func init() {
@@ -44,14 +42,8 @@ type Close struct {
 // Call the function with the arguments provided.
 func (f *Close) Call(s *slip.Scope, args slip.List, depth int) slip.Object {
 	slip.CheckArgCount(s, depth, f, args, 1, 1)
-	inst, ok := args[0].(*flavors.Instance)
-	if !ok {
-		slip.TypePanic(s, depth, "reader", args[0], "parquet-reader-flavor instance")
-	}
-	var fr *pqarrow.FileReader
-	if fr, ok = inst.Any.(*pqarrow.FileReader); !ok {
-		slip.TypePanic(s, depth, "reader", args[0], "parquet-reader-flavor instance")
-	}
-	_ = fr.ParquetReader().Close()
+	sh := readerArg(s, args, depth)
+	sh.close()
+
 	return nil
 }
