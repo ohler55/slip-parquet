@@ -238,3 +238,65 @@ README, so the examples cannot drift. `make test` green.
 Writer support (`notes.md` "next"); multi-shard datasets as one logical table;
 dictionary-column fast path (correct today, just slow); explicit
 Decimal32/64/128/256 cases; `context` plumbing for cancellation.
+
+---
+
+# Phase 2 — deferred items
+
+Taken from the Out of scope list above, in the order asked for.
+
+## 10. Multi-shard datasets
+
+A HuggingFace split is a list of shard URLs, not one file. Open a list and
+treat it as one logical table.
+
+**Design.** `inst.Any` becomes a `*shards` holding `[]*pqarrow.FileReader`
+uniformly — a single file is simply one shard. That collapses the 21 places
+that currently type assert `inst.Any.(*pqarrow.FileReader)` into one accessor
+and is what makes every existing method work on a dataset without a parallel
+flavor. `parquet-open` and the `:file` init keyword accept a list as well as a
+string.
+
+Aggregation rules:
+
+| method | across shards |
+|---|---|
+| `:row-count`, `:row-group-count` | summed |
+| `:rows`, `:each-row`, `:column`, `:columns` | concatenated in order |
+| `:row-group-info`, `:statistics` | global row group index across shards |
+| `:schema`, `:column-count`, `:version`, `:created-by`, `:metadata` | first shard |
+| `:filepath` | a list when more than one |
+| `:close` | all shards |
+
+Shards must share a schema. A mismatch is an error at open rather than a
+confusing read later.
+
+*Verify:* the same rows come back from one 15 row file as from three 5 row
+shards; offset and limit spanning a shard boundary match a full read; schema
+mismatch raises; close closes every shard.
+
+## 11. Dictionary column fast path
+
+Dictionary encoded columns fall through to `GetOneForMarshal` and are decoded
+via JSON. Correct but slow, and HuggingFace leans on dictionary encoding for
+categorical strings.
+
+*Verify:* an `*array.Dictionary` case in `arrayValue` returns values equal to
+the current JSON path for every index type; a benchmark shows it is faster.
+
+## 12. Context plumbing
+
+`context.Background()` is hardcoded at every `GetColumn` / `GetFieldReader`
+call. Now that reads are network bound a slow or hung server cannot be given
+up on.
+
+*Verify:* a reader opened against a server that never responds fails rather
+than hanging forever.
+
+## 13. Decimal cases
+
+Decimal128/256, and now 32/64, have no explicit case so they take the JSON
+path. Precision matters for decimals so this should be deliberate.
+
+*Verify:* a decimal fixture reads back with full precision through the typed
+path and matches what the JSON path produced.
