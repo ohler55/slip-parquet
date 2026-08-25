@@ -36,6 +36,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   seconds a remote server has to answer. The default is 30, which is what was previously
   hard coded. It covers connecting and waiting for the response headers and does not bound
   the transfer of the body.
+- A getting started guide, [GETTING_STARTED.md](GETTING_STARTED.md), walking through opening a
+  31 shard HuggingFace dataset over HTTP, looking at it, and printing rows from the middle
+  without downloading the several gigabytes it holds.
 
 ### Changed
 - Migrated from `github.com/apache/arrow/go/v15` v15.0.2 to `github.com/apache/arrow-go/v18` v18.7.0.
@@ -60,6 +63,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   those branches could not execute. Behaviour is unchanged.
 
 ### Fixed
+- Passing a non-keyword where `parquet-open` expects an option now raises a _type-error_. It
+  was silently ignored along with the value following it, so a mistyped option looked like it
+  had been applied.
+- A `parquet-open` that fails part way through no longer leaks the file it opened. A remote
+  file that could not be parsed left its connections open and a file whose arrow reader could
+  not be built left the parquet reader open.
 - Decimal column values keep the scale the column declares. A decimal of scale 2 holding 10.50
   read as _"10.5"_ and one holding 0.00 read as _"0"_ because the value was formatted through a
   float which drops trailing zeros. They now read as _"10.50"_ and _"0.00"_. Decimals are read

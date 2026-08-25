@@ -147,18 +147,18 @@ Put the whole thing in a file and hand it to `slap`:
 
 ```
 export HF_TOKEN=hf_...
-slap gettingstarted.lisp
+slap getting-started.lisp
 ```
 
 `slap` drops into the REPL after the script so the reader can be poked at
 further. Redirect stdin to run it and exit:
 
 ```
-slap gettingstarted.lisp < /dev/null
+slap getting-started.lisp < /dev/null
 ```
 
 ```lisp
-;; gettingstarted.lisp
+;; getting-started.lisp
 (setq base "https://huggingface.co/api/datasets/mvaccargiu/gitskills/parquet/artifacts/train/")
 (setq shards nil)
 (dotimes (n 31)

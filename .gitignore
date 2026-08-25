@@ -19,3 +19,16 @@
 
 # Go workspace file
 go.work
+go.work.sum
+
+# Environment files, which may hold access tokens such as HF_TOKEN
+.env
+.env.*
+
+# Editor and IDE directories
+.idea/
+.vscode/
+*.swp
+
+# macOS
+.DS_Store

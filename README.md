@@ -32,6 +32,10 @@ path to the directory containing the `parquet.so` file.
 
 ## Usage
 
+[GETTING_STARTED.md](GETTING_STARTED.md) walks through opening a multi-shard
+HuggingFace dataset without downloading it. The rest of this section covers each
+piece on its own.
+
 Open a file and ask it questions. The reader should be closed when done.
 
 ```lisp
