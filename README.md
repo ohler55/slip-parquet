@@ -29,3 +29,214 @@ path to the directory containing the `parquet.so` file.
 ```lisp
 (require 'parquet "my-package-directory")
 ```
+
+## Usage
+
+[GETTING_STARTED.md](GETTING_STARTED.md) walks through opening a multi-shard
+HuggingFace dataset without downloading it. The rest of this section covers each
+piece on its own.
+
+Open a file and ask it questions. The reader should be closed when done.
+
+```lisp
+(setq reader (parquet-open "sample.parquet"))
+
+(send reader :row-count)     ;; => 15
+(send reader :column-count)  ;; => 2
+(send reader :created-by)    ;; => "parquet-go version 18.7.0"
+
+(mapcar (lambda (f) (send f :name)) (send (send reader :schema) :fields))
+;; => ("id" "name")
+
+(send reader :close)
+```
+
+Rows come back either as a list of values in column order or as an assoc
+list keyed by column name. A list of column names or indexes limits which
+columns are read.
+
+```lisp
+(send reader :rows :list :limit 3)
+;; => ((0 "row-00") (1 "row-01") (2 "row-02"))
+
+(send reader :rows :assoc '("id") :offset 10 :limit 2)
+;; => ((("id" . 10)) (("id" . 11)))
+```
+
+`:offset` and `:limit` only read the row groups holding the rows asked
+for, so paging through a large file does not read all of it. To walk the
+rows without building a list use `:each-row`, and to stop before the end
+use a `block` and `return-from`.
+
+```lisp
+(send reader :each-row (lambda (row) (print row)) :list '("id") :limit 3)
+
+(block walk
+  (send reader :each-row
+        (lambda (row) (when (< 100 (car row)) (return-from walk)) (print row))
+        :list '("id")))
+```
+
+Every function has a matching method and the other way round, so
+`(parquet-rows reader :list)` and `(send reader :rows :list)` are the
+same except that the function form calls no daemons.
+
+### Remote files
+
+A file name that begins with `http://` or `https://` is read over the
+network with range requests. Only the footer and the column chunks
+actually used are fetched, so a multi gigabyte file can be examined
+without downloading it. The server has to support range requests.
+
+```lisp
+(setq reader (parquet-open
+  "https://huggingface.co/api/datasets/stanfordnlp/imdb/parquet/plain_text/train/0.parquet"))
+
+(send reader :row-count)        ;; => 25000
+(send reader :row-group-count)  ;; => 25
+
+(send reader :rows :list '("label") :offset 12498 :limit 4)
+;; => ((0) (0) (1) (1))
+```
+
+That last read pulled four rows from the middle of a 21MB file over the
+network. Set the `HF_TOKEN` environment variable to reach a gated or
+private HuggingFace dataset. The token is only ever sent to
+`huggingface.co` and never to any other host.
+
+A remote server is given 30 seconds to answer before the read is given up
+on. Use `:timeout` to change it.
+
+```lisp
+(parquet-open "https://host/big.parquet" :timeout 5)
+```
+
+The timeout covers connecting and waiting for the response headers. It
+does not bound the transfer of the body since a single column chunk can
+legitimately take a long time over a slow link. Closing the reader
+cancels any read still in flight.
+
+### Looking at a file
+
+`parquet-explore` writes a few rows as a table. It is for eyeballing a
+file rather than for reading it, so values are cut short and only the
+rows shown are read.
+
+```lisp
+(parquet-explore reader :limit 3 :summary t)
+```
+
+```
+25000 rows, 2 columns, 25 row groups, showing 1-3
+
+| text                                     | label |
+| ---------------------------------------- | ----- |
+| I rented I AM CURIOUS-YELLOW from my vi… | 0     |
+| "I Am Curious: Yellow" is a risible and… | 0     |
+| If only to avoid making this type of fi… | 0     |
+```
+
+That came from a 21MB file over the network and read three rows of it.
+
+The columns can be picked the same way as with `:rows`, and `:tsv` gives
+tab separated output for pasting into a spreadsheet.
+
+```lisp
+(parquet-explore reader '("id" "name") :limit 2 :format :tsv)
+```
+
+```
+id	name
+0	row-00
+1	row-01
+```
+
+`:width` sets how much of a value is shown, 40 by default, and a zero
+leaves values whole. `:offset` starts somewhere other than the beginning.
+The summary line is off by default so the output can be pasted straight
+into a document, and `:stream` writes somewhere other than
+`*standard-output*`.
+
+A null shows as an empty cell, which makes it look the same as an empty
+string. Pass `:null` when the difference matters.
+
+```lisp
+(parquet-explore reader :null "NULL")
+```
+
+### Datasets split into shards
+
+A dataset is often stored as several files rather than one. A HuggingFace
+split is a list of shard URLs. Pass the list and the reader presents them
+as a single table: row counts are summed, rows are read shard by shard in
+order, and paging spans the boundaries between them.
+
+```lisp
+(setq reader (parquet-open '("part-0.parquet" "part-1.parquet" "part-2.parquet")))
+
+(send reader :row-count)  ;; the total across all three
+
+(send reader :rows :list '("id") :offset 3 :limit 4)
+;; => ((3) (4) (5) (6))   ;; spans the first and second shard
+```
+
+The schema, version, created-by, and metadata come from the first shard.
+Every shard must have the same schema; opening a list whose shards
+disagree is an error rather than a confusing read later. Row groups are
+numbered across the whole dataset and each reports the `shard` it came
+from.
+
+### Looking before reading
+
+Row group information and column statistics come from the file footer so
+neither reads any column data. Both are a cheap way to size up a file,
+and both work the same on a remote file.
+
+```lisp
+(send reader :row-group-count)
+;; => 3
+
+(send reader :row-group-info 1)
+;; => (("shard" . 0) ("rows" . 5) ("columns" . 2) ("byte-size" . 188)
+;;     ("compressed-size" . 188))
+
+(send reader :statistics "id")
+;; => ((("row-group" . 0) ("shard" . 0) ("num-values" . 5) ("min" . 0) ("max" . 4)
+;;      ("null-count" . 0) ("distinct-count" . nil))
+;;     ...)
+```
+
+Statistics are optional in a parquet file. When a writer recorded none
+the `min` and `max` are nil. They are keyed by leaf column path so a
+column nested in a struct is named `st.a` rather than `st`.
+
+### File metadata
+
+Any writer can put a map of strings in the file footer. Spark keeps its
+SQL schema there, Arrow keeps a serialized schema, and a HuggingFace
+dataset keeps its feature spec.
+
+```lisp
+(mapcar 'car (send reader :metadata))
+;; => ("huggingface" "ARROW:schema")
+
+(cdr (assoc "huggingface" (send reader :metadata)))
+;; => "{\"info\": {\"features\": {\"label\": {\"names\": [\"neg\", \"pos\"], ...
+```
+
+Values are returned exactly as written so a value holding JSON is parsed
+by the caller. That is what turns a `label` of 0 into `"neg"`.
+
+### Nulls and binary columns
+
+A null column value is nil. Note that a null and a false in a boolean
+column are both nil since nil is false in lisp.
+
+Parquet stores text and raw bytes in the same physical type and only
+some writers record which is which. An unannotated column is a string by
+default. For a column holding an image, audio, or another binary payload
+open the reader with `:binary-as :octets`.
+
+```lisp
+(setq reader (parquet-open "images.parquet" :binary-as :octets))
+```

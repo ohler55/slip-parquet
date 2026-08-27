@@ -1,0 +1,229 @@
+// Copyright (c) 2026, Peter Ohler, All rights reserved.
+
+//go:build hflive
+
+// Reaches out to huggingface.co so it is not part of the normal test run. Use
+//
+//	go test -tags hflive -run Live ./slipparquet/
+//
+// to include it.
+package slipparquet
+
+import (
+	"context"
+	"fmt"
+	"strings"
+	"testing"
+
+	"github.com/apache/arrow-go/v18/parquet/file"
+	"github.com/ohler55/ojg/tt"
+	"github.com/ohler55/slip"
+	"github.com/ohler55/slip/sliptest"
+)
+
+const imdbURL = "https://huggingface.co/api/datasets/stanfordnlp/imdb/parquet/plain_text/train/0.parquet"
+
+// The wikitext-103 train split is served as two shards which is the normal
+// shape of a HuggingFace dataset.
+const wikitextBase = "https://huggingface.co/api/datasets/Salesforce/wikitext/parquet/wikitext-103-raw-v1/train/"
+
+func TestLiveHuggingFace(t *testing.T) {
+	r, err := newHTTPReader(context.Background(), imdbURL, 0)
+	tt.Nil(t, err)
+	defer func() { _ = r.Close() }()
+	tt.Equal(t, true, 20_000_000 < r.size)
+
+	pr, err := file.NewParquetReader(r)
+	tt.Nil(t, err)
+	defer func() { _ = pr.Close() }()
+
+	tt.Equal(t, int64(25000), pr.NumRows())
+	tt.Equal(t, 25, pr.NumRowGroups())
+
+	// The feature spec that names the class labels rides along in the file
+	// key-value metadata. Step 6 exposes it to SLIP.
+	kv := pr.MetaData().KeyValueMetadata()
+	tt.NotNil(t, kv.FindValue("huggingface"))
+}
+
+// The whole point of steps 1 and 2: browse a real HuggingFace dataset from
+// SLIP without downloading it.
+func TestLiveHuggingFaceFromSlip(t *testing.T) {
+	scope := slip.NewScope()
+	scope.Let("reader", nil)
+	_ = slip.ReadString(fmt.Sprintf(`(setq reader (parquet-open "%s"))`, imdbURL), scope).Eval(scope, nil)
+	defer func() { _ = slip.ReadString(`(send reader :close)`, scope).Eval(scope, nil) }()
+
+	(&sliptest.Function{
+		Scope:  scope,
+		Source: `(send reader :row-count)`,
+		Expect: "25000",
+	}).Test(t)
+	(&sliptest.Function{
+		Scope:  scope,
+		Source: `(send reader :column-count)`,
+		Expect: "2",
+	}).Test(t)
+	(&sliptest.Function{
+		Scope:  scope,
+		Source: `(mapcar (lambda (f) (send f :name)) (send (send reader :schema) :fields))`,
+		Expect: `("text" "label")`,
+	}).Test(t)
+	(&sliptest.Function{
+		Scope:  scope,
+		Source: `(send reader :row-group-count)`,
+		Expect: "25",
+	}).Test(t)
+	(&sliptest.Function{
+		Scope:  scope,
+		Source: `(cdr (assoc "rows" (send reader :row-group-info 0)))`,
+		Expect: "1000",
+	}).Test(t)
+}
+
+// Paging deep into a 21MB remote file must not read the whole thing.
+func TestLiveHuggingFacePaging(t *testing.T) {
+	scope := slip.NewScope()
+	scope.Let("reader", nil)
+	_ = slip.ReadString(fmt.Sprintf(`(setq reader (parquet-open "%s"))`, imdbURL), scope).Eval(scope, nil)
+	defer func() { _ = slip.ReadString(`(send reader :close)`, scope).Eval(scope, nil) }()
+
+	(&sliptest.Function{
+		Scope:  scope,
+		Source: `(length (send reader :rows :list '("label") :offset 10000 :limit 5))`,
+		Expect: "5",
+	}).Test(t)
+	// Row 12500 is where the imdb train split flips from neg to pos.
+	(&sliptest.Function{
+		Scope:  scope,
+		Source: `(send reader :rows :list '("label") :offset 12498 :limit 4)`,
+		Expect: `((0) (0) (1) (1))`,
+	}).Test(t)
+}
+
+// The HuggingFace feature spec rides in the standard parquet key-value
+// metadata. Decoding it is left to lisp which is why the package stays a
+// parquet package rather than a HuggingFace client.
+func TestLiveHuggingFaceMetadata(t *testing.T) {
+	scope := slip.NewScope()
+	scope.Let("reader", nil)
+	_ = slip.ReadString(fmt.Sprintf(`(setq reader (parquet-open "%s"))`, imdbURL), scope).Eval(scope, nil)
+	defer func() { _ = slip.ReadString(`(send reader :close)`, scope).Eval(scope, nil) }()
+
+	(&sliptest.Function{
+		Scope:  scope,
+		Source: `(mapcar 'car (send reader :metadata))`,
+		Expect: `("huggingface" "ARROW:schema")`,
+	}).Test(t)
+	// The class label names are what turn a label of 0 into "neg". The value is
+	// returned as written so parsing it is up to the caller.
+	spec, _ := slip.ReadString(
+		`(cdr (assoc "huggingface" (send reader :metadata)))`, scope).Eval(scope, nil).(slip.String)
+	tt.Equal(t, true, strings.Contains(string(spec), `"names": ["neg", "pos"]`), string(spec))
+}
+
+// Statistics come from the footer so browsing a remote file this way reads no
+// column data at all.
+func TestLiveHuggingFaceStatistics(t *testing.T) {
+	scope := slip.NewScope()
+	scope.Let("reader", nil)
+	_ = slip.ReadString(fmt.Sprintf(`(setq reader (parquet-open "%s"))`, imdbURL), scope).Eval(scope, nil)
+	defer func() { _ = slip.ReadString(`(send reader :close)`, scope).Eval(scope, nil) }()
+
+	(&sliptest.Function{
+		Scope:  scope,
+		Source: `(mapcar 'car (send reader :statistics))`,
+		Expect: `("text" "label")`,
+	}).Test(t)
+	(&sliptest.Function{
+		Scope:  scope,
+		Source: `(length (send reader :statistics "label"))`,
+		Expect: "25",
+	}).Test(t)
+	// The first 12 row groups are all label 0, the split is sorted.
+	(&sliptest.Function{
+		Scope:  scope,
+		Source: `(cdr (assoc "max" (car (send reader :statistics "label"))))`,
+		Expect: "0",
+	}).Test(t)
+	// The last row group is all label 1.
+	(&sliptest.Function{
+		Scope:  scope,
+		Source: `(cdr (assoc "min" (car (last (send reader :statistics "label")))))`,
+		Expect: "1",
+	}).Test(t)
+}
+
+// A real HuggingFace split read as one table. The row count of the dataset has
+// to be the sum of the shards read on their own.
+func TestLiveHuggingFaceShards(t *testing.T) {
+	scope := slip.NewScope()
+	scope.Let("reader", nil)
+	scope.Let("a", nil)
+	scope.Let("b", nil)
+	_ = slip.ReadString(fmt.Sprintf(
+		`(setq reader (parquet-open '("%s0.parquet" "%s1.parquet")))`,
+		wikitextBase, wikitextBase), scope).Eval(scope, nil)
+	_ = slip.ReadString(fmt.Sprintf(`(setq a (parquet-open "%s0.parquet"))`, wikitextBase), scope).Eval(scope, nil)
+	_ = slip.ReadString(fmt.Sprintf(`(setq b (parquet-open "%s1.parquet"))`, wikitextBase), scope).Eval(scope, nil)
+	defer func() {
+		for _, v := range []string{"reader", "a", "b"} {
+			_ = slip.ReadString("(send "+v+" :close)", scope).Eval(scope, nil)
+		}
+	}()
+
+	(&sliptest.Function{
+		Scope:  scope,
+		Source: `(= (send reader :row-count) (+ (send a :row-count) (send b :row-count)))`,
+		Expect: "t",
+	}).Test(t)
+	(&sliptest.Function{
+		Scope: scope,
+		Source: `(= (send reader :row-group-count)
+                    (+ (send a :row-group-count) (send b :row-group-count)))`,
+		Expect: "t",
+	}).Test(t)
+	// The first rows of the dataset are the first rows of the first shard.
+	(&sliptest.Function{
+		Scope:  scope,
+		Source: `(equal (send reader :rows :list :limit 3) (send a :rows :list :limit 3))`,
+		Expect: "t",
+	}).Test(t)
+	// Reading past the end of the first shard lands in the second one.
+	(&sliptest.Function{
+		Scope: scope,
+		Source: `(equal (send reader :rows :list :offset (send a :row-count) :limit 3)
+                        (send b :rows :list :limit 3))`,
+		Expect: "t",
+	}).Test(t)
+	// Row groups past the first shard report the second shard.
+	(&sliptest.Function{
+		Scope:  scope,
+		Source: `(cdr (assoc "shard" (send reader :row-group-info (send a :row-group-count))))`,
+		Expect: "1",
+	}).Test(t)
+}
+
+// Exploring a remote dataset shows a few rows without reading the file.
+func TestLiveHuggingFaceExplore(t *testing.T) {
+	scope := slip.NewScope()
+	scope.Let("reader", nil)
+	_ = slip.ReadString(fmt.Sprintf(`(setq reader (parquet-open "%s"))`, imdbURL), scope).Eval(scope, nil)
+	defer func() { _ = slip.ReadString(`(send reader :close)`, scope).Eval(scope, nil) }()
+
+	v := slip.ReadString(
+		`(with-output-to-string (s) (parquet-explore reader :limit 3 :summary t :stream s))`,
+		scope).Eval(scope, nil)
+	out, _ := v.(slip.String)
+	lines := strings.Split(string(out), "\n")
+	tt.Equal(t, "25000 rows, 2 columns, 25 row groups, showing 1-3", lines[0])
+	// Summary, blank, header, rule, three rows, and the trailing newline.
+	tt.Equal(t, 8, len(lines))
+	// Every line of the table is the same width even though the reviews are
+	// thousands of characters long.
+	width := len([]rune(lines[2]))
+	for _, ln := range lines[2:7] {
+		tt.Equal(t, width, len([]rune(ln)), ln)
+	}
+	fmt.Println(string(out))
+}

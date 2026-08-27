@@ -5,8 +5,7 @@ package slipparquet
 import (
 	"io"
 
-	"github.com/apache/arrow/go/v15/parquet/pqarrow"
-	"github.com/apache/arrow/go/v15/parquet/schema"
+	"github.com/apache/arrow-go/v18/parquet/schema"
 	"github.com/ohler55/slip"
 	"github.com/ohler55/slip/pkg/flavors"
 )
@@ -79,15 +78,9 @@ type Schema struct {
 // Call the function with the arguments provided.
 func (f *Schema) Call(s *slip.Scope, args slip.List, depth int) slip.Object {
 	slip.CheckArgCount(s, depth, f, args, 1, 1)
-	inst, ok := args[0].(*flavors.Instance)
-	if !ok {
-		slip.TypePanic(s, depth, "reader", args[0], "parquet-reader-flavor instance")
-	}
-	var fr *pqarrow.FileReader
-	if fr, ok = inst.Any.(*pqarrow.FileReader); !ok {
-		slip.TypePanic(s, depth, "reader", args[0], "parquet-reader-flavor instance")
-	}
-	return makeSchemaInstance(fr.ParquetReader().MetaData().Schema.Root())
+	sh := readerArg(s, args, depth)
+
+	return makeSchemaInstance(sh.first().ParquetReader().MetaData().Schema.Root())
 }
 
 // SchemaFlavor returns the schema flavor.

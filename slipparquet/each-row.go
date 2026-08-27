@@ -3,10 +3,8 @@
 package slipparquet
 
 import (
-	"github.com/apache/arrow/go/v15/parquet/pqarrow"
 	"github.com/ohler55/slip"
 	"github.com/ohler55/slip/pkg/cl"
-	"github.com/ohler55/slip/pkg/flavors"
 )
 
 func init() {
@@ -43,10 +41,27 @@ of each element in an assoc list for each key value pair.`,
 					Text: `A list of the column indexes or names for the columns to get values
 from. The default is all columns`,
 				},
+				{Name: "&key"},
+				{
+					Name: ":offset",
+					Type: "fixnum",
+					Text: "The number of rows to skip. The default is 0.",
+				},
+				{
+					Name: ":limit",
+					Type: "fixnum",
+					Text: `The maximum number of rows. The default is all of them.
+
+Only the row groups holding the requested rows are read so paging through a large
+or remote file does not read the whole file.`,
+				},
 			},
 			Return: "nil",
 			Text: `__parquet-each-row__ calls the _function_ for each row in the parquet
 reader in the _format_ specified and with the columns identified by the _column-ids_.
+
+To stop before the last row use a _block_ and _return-from_ in the _function_. The reader
+is not closed by leaving early so it can still be used afterwards.
 
 This is the same as sending _:each-row_ to an instance of the _parquet-reader-flavor_ except
 that none of the _:each-row_ daemons are called.`,
@@ -65,22 +80,12 @@ type EachRow struct {
 
 // Call the function with the arguments provided.
 func (f *EachRow) Call(s *slip.Scope, args slip.List, depth int) slip.Object {
-	slip.CheckArgCount(s, depth, f, args, 3, 4)
-	inst, ok := args[0].(*flavors.Instance)
-	if !ok {
-		slip.TypePanic(s, depth, "reader", args[0], "parquet-reader-flavor instance")
-	}
-	var fr *pqarrow.FileReader
-	if fr, ok = inst.Any.(*pqarrow.FileReader); !ok {
-		slip.TypePanic(s, depth, "reader", args[0], "parquet-reader-flavor instance")
-	}
+	slip.CheckArgCount(s, depth, f, args, 3, 8)
+	fr, octets := readerOctets(s, args, depth)
 	d2 := depth + 1
 	fun := cl.ResolveToCaller(s, args[1], d2)
-	var ids slip.Object
-	if 3 < len(args) {
-		ids = args[3]
-	}
-	rr := newRowReader(s, fr, ids, args[2], depth)
+	ids, offset, limit := parseRowOpts(s, args[3:], depth)
+	rr := newRowReader(s, fr, ids, args[2], offset, limit, octets, depth)
 	for {
 		row := rr.next()
 		if row == nil {

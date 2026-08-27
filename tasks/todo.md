@@ -1,0 +1,434 @@
+# slip-parquet — HuggingFace browsing support
+
+**Goal:** open a HuggingFace parquet URL directly, page through it without
+materializing the whole file, and get back values that faithfully represent
+what is stored (nulls, bytes, class labels).
+
+**Scope:** Tier 1 (remote + paging + row groups) **complete** and Tier 2
+(nulls, key-value metadata, octets, statistics) from the gap analysis. Writer support and
+multi-shard datasets are explicitly out of scope.
+
+**Branch:** `feat/hf-browsing` off `develop` (after `chore/update-arrow` lands).
+
+---
+
+## Evidence this approach works
+
+Verified against `stanfordnlp/imdb` before planning:
+
+- HF serves parquet with `accept-ranges: bytes` and answers range requests `206`.
+- A ~40-line `io.ReaderAt`+`io.Seeker` fed to `file.NewParquetReader` read the
+  full schema, all 25 row groups, and per-column statistics in
+  **3 range requests / 62 KB of a 21 MB file**.
+- File key-value metadata carries the HF feature spec:
+  `{"info":{"features":{"label":{"names":["neg","pos"],"_type":"ClassLabel"}}}}`
+
+---
+
+## Design decisions
+
+### Settled
+
+1. **URL detection in `parquet-open`.** A `string` beginning `http://` or
+   `https://` opens a range-backed remote reader; anything else stays
+   `file.OpenParquetFile`. One entry point, no new surface, existing callers
+   unaffected. Same rule applies to the `:file` init keyword.
+2. **`parquet.ReaderAtSeeker` is the whole contract** — `io.ReaderAt` +
+   `io.Seeker` (plus `Read`). No arrow-side changes needed.
+3. **Nulls map to `nil`.** Idiomatic for SLIP and already what `array.Null`
+   produces today.
+4. **No HF-specific decoding in Go.** Expose raw key-value metadata; let SLIP
+   code parse the `huggingface` JSON. Keeps the package generic.
+
+### Resolved during implementation
+
+5. **`array.Binary` -> `slip.Octets` is a behaviour change.** In
+   `testdata/primitive.parquet`, `string_col` and `date_string_col` are parquet
+   `BYTE_ARRAY` with no UTF8 annotation, so they arrive as `*array.Binary` and
+   today return `slip.String`. Switching unconditionally to `slip.Octets` turns
+   currently-readable text into byte vectors and breaks existing tests.
+   Options: (a) unconditional `Octets` + changelog note, (b) `utf8.Valid()`
+   heuristic, (c) reader option `:binary-as :string|:octets` defaulting to
+   current behaviour. **Recommend (c).**
+
+6. **Null vs. false for boolean columns.** SLIP `nil` is already `false`, so a
+   null boolean and a false boolean collapse. Inherent to Lisp; accept unless a
+   `*parquet-null*` sentinel is wanted.
+
+---
+
+## Steps
+
+### 1. HTTP range reader — DONE
+New `httpreader.go`: `httpReaderAt` implementing `ReadAt`/`Read`/`Seek`.
+HEAD to resolve redirects (HF redirects to a CDN host) and read
+`Content-Length`; refuse if `Accept-Ranges: bytes` is absent. Configurable
+timeout. Sends `Authorization: Bearer $HF_TOKEN` when that env var is set, so
+gated datasets work.
+
+*Verified:* 22 tests in `httpreader_test.go`, 100% of `newHTTPReader` and
+92.6% of `ReadAt` covered. Includes serving a real fixture over HTTP and
+diffing every value against the same file read from disk, and a check that
+reading metadata alone fetches under half the file. Live test against imdb
+behind `-tags hflive` passes (25000 rows, 25 row groups).
+
+### 2. Wire remote into `parquet-open` — DONE
+Split `initReader` into local and remote paths on URL prefix. Ensure
+`:close` releases the HTTP reader (implement `io.Closer`).
+
+*Verified:* 11 SLIP-level tests in `open_remote_test.go`. `:row-count`,
+`:column-count`, `:created-by`, `:version`, `:column` and `:rows` all return
+byte-identical results from a served fixture and the same file on disk.
+`make-instance :file <url>` works, `:filepath` holds the URL, double close is
+safe. Errors (404, no range support, unreachable, non-parquet body, missing
+local file) all raise `file-error`. Live test confirms 25000 rows, 2 columns
+and fields `("text" "label")` from imdb.
+
+Note: `initReader` now takes scope and depth and raises `slip.FilePanic`
+instead of a raw `panic(err)`, so a missing *local* file also became a
+`file-error`. No arrow change was needed for close: `file.Reader.Close` calls
+`Close` on the source when it implements `io.Closer`.
+
+### 3. Row-group access — DONE
+`:row-group-count` -> fixnum. `:row-group-info n` -> assoc list of rows,
+byte size, compressed size. Standalone `parquet-row-group-count`.
+
+*Verified:* `parquet-row-group-count` / `:row-group-count` and
+`parquet-row-group-info` / `:row-group-info` added. 6 tests including one that
+asserts the per-group row counts sum to `:row-count` across three fixtures,
+which is the invariant paging depends on. Out-of-range and non-fixnum indexes
+raise. Live: imdb reports 25 groups, group 0 has 1000 rows.
+
+### 4. Paging and early exit — DONE
+`:offset` / `:limit` added to `:rows`, `:each-row` and both function forms as
+`&key` arguments. `rowGroupsFor` picks only the row groups covering the
+requested range, so groups below the offset and above the limit are never read.
+Rows to drop inside the first selected group are skipped with `NextBatch`
+rather than converted to lisp objects. With no offset and no limit the old
+whole-file `GetColumn` path is used unchanged.
+
+**Deviation:** the plan said to treat a non-nil callback return from
+`:each-row` as "stop". That was dropped — a callback ending in `print` or
+`setq` returns non-nil and would silently stop after one row. `block` /
+`return-from` already unwinds cleanly out of the Go loop, and the reader
+belongs to the caller so nothing leaks. Tested and documented instead.
+
+*Verified:* 13 tests. `TestRowsPagingMatchesFullRead` cross-checks all 289
+offset/limit combinations from 0..16 against `subseq` of a full read. New
+fixture `testdata/multi-group.parquet` (15 rows in 3 groups of 5) makes group
+skipping observable. `TestPagingRemoteFetchesLess` shows `:limit 1` transfers
+188 bytes where a full read takes 564. `TestEachRowEarlyExit` confirms
+`return-from` stops the walk and leaves the reader usable. Live: 5 rows at
+offset 10000 of the 21MB imdb file, and rows 12498-12501 return
+`((0) (0) (1) (1))` — the exact neg/pos boundary of the split.
+
+### 5. Null handling — DONE
+`IsNull(i)` guard at the top of `ArrayValue`. New fixture with nulls in int64,
+double, string, bool, and list columns — none of the seven current fixtures has
+a single null, which is why this went unnoticed.
+
+*Verified:* new fixture `testdata/nulls.parquet` holds 8 columns each with a
+value, a null, and the natural zero value, so null and zero can be told apart.
+11 SLIP level tests cover `:rows`, `:column`, `:each-row`, `:assoc` and paging.
+
+Measured before and after on the fixture:
+
+| column | before | after |
+|---|---|---|
+| i64 | `(7) (0) (0)` | `(7) (nil) (0)` |
+| f64 | `(1.5) (0) (0)` | `(1.5) (nil) (0)` |
+| str | `("a") ("") ("")` | `("a") (nil) ("")` |
+| date | `(...) (@1970-01-01) (@1970-01-01)` | `(...) (nil) (@1970-01-01)` |
+
+The date case was the worst of them: a null produced a real date that was
+never in the file.
+
+**Existing tests had encoded the bug.** All 17 `ArrayValue` tests in
+`arrayvalue_test.go` appended a null and asserted it read back as the zero
+value. Those assertions were corrected to `nil`. Booleans already expected
+`nil` since lisp `nil` is false, so nothing changed there.
+
+Decision 6 stands: a null boolean and a false boolean both read as `nil` and
+that is inherent to lisp rather than something this package can fix.
+
+### 6. Key-value metadata — DONE
+`:metadata` -> assoc list from `MetaData().KeyValueMetadata()`.
+Standalone `parquet-metadata`.
+
+*Verified:* `parquet-metadata` and `:metadata` return an assoc list, or nil for
+a file with no key-value metadata. 6 tests over fixtures written by three
+different applications, which also settles the question of whether this is a
+HuggingFace specific feature — it is not:
+
+| fixture | keys |
+|---|---|
+| `binary.parquet` | `parquet.proto.descriptor`, `writer.model.name`, `parquet.proto.class` |
+| `nested-maps.parquet`, `nested-list.parquet` | `org.apache.spark.sql.parquet.row.metadata` |
+| `null-list.parquet` | `ARROW:schema` |
+| imdb (live) | `huggingface`, `ARROW:schema` |
+
+Live test confirms the `huggingface` value carries `"names": ["neg", "pos"]`.
+Per settled decision 4 the value is returned as written and parsing is left to
+lisp, so no HuggingFace knowledge is in the Go code.
+
+### 7. Column statistics — DONE
+`:statistics &optional column-id` -> per row-group min/max/null-count/
+distinct-count, nil where absent.
+
+*Verified:* `parquet-statistics` and `:statistics` take an optional column id.
+With one, a list of per row group assoc lists with keys `row-group`,
+`num-values`, `min`, `max`, `null-count`, `distinct-count`. Without one, every
+column keyed by its leaf path. 9 tests.
+
+`multi-group.parquet` reports min/max of 0-4, 5-9, 10-14 across its three row
+groups, which shows the values really are per chunk. `nulls.parquet` reports
+`null-count 1` without reading any data. `primitive.parquet` carries no
+statistics at all so only `row-group` and `num-values` appear — absent
+statistics are a normal case rather than an error.
+
+Columns are identified by leaf path since that is what parquet keys statistics
+by, so `nulls.parquet` exposes `lst.list.element` and `st.a`. Live: imdb has 25
+entries for `label`, first group max 0 and last group min 1, confirming the
+split is sorted.
+
+### 8. Binary as octets — DONE
+Per decision 5. Covers both the top-level `*array.Binary` case and the
+`[]byte` case in `JSONToLisp` — HF `Image`/`Audio` features are
+`struct<bytes: binary, path: string>` and reach SLIP through the JSON path,
+where raw bytes currently become a `slip.String`
+(confirmed: `{"bytes" . "\x89PNG\r"}`).
+
+*Verified:* **Decision 5 resolved as option (c).** A reader option
+`:binary-as :string|:octets` on `parquet-open` and the `:file` init keywords,
+defaulting to `:string` which is today's behaviour. Parquet cannot tell text
+from bytes for an unannotated `BYTE_ARRAY`, so the file genuinely does not
+carry the answer and the caller has to supply it. Nothing existing changed.
+
+Both paths are covered: the typed `*array.Binary` case and the `[]byte` case in
+`JSONToLisp`, which is how a nested HuggingFace image feature
+(`struct<bytes, path>`) reaches lisp.
+
+Exported API stayed additive: `ArrayValue` and `JSONToLisp` keep their
+signatures and behaviour, with `ArrayValueOctets` and `JSONToLispOctets` added
+alongside. Both delegate to a private implementation.
+
+10 tests. PNG magic round-trips as `slip.Octets{0x89 0x50 0x4e 0x47}` where the
+string form mangles it. A null binary is still nil rather than empty octets.
+Text columns are unaffected.
+
+**Gotcha worth recording:** a flavor init keyword whose name matches an
+instance variable is assigned by the flavor *before* `:init` runs and is
+stripped from the `:init` arguments. `initReader` was overwriting it with nil.
+`:init` now reads the instance variable back to validate it.
+
+### 9. Docs — DONE
+README section on remote/HF usage with a worked example; `:doc` strings for
+every new method; CHANGELOG entry.
+
+*Verified:* README gained a Usage section covering rows, paging, early exit,
+remote files, row group info, statistics, metadata, nulls, and `:binary-as`.
+Every documented form is executed by `readme_test.go` against
+`multi-group.parquet` and checked against the exact output printed in the
+README, so the examples cannot drift. `make test` green.
+
+---
+
+## Out of scope
+
+Writer support (`notes.md` "next"); multi-shard datasets as one logical table;
+dictionary-column fast path (correct today, just slow); explicit
+Decimal32/64/128/256 cases; `context` plumbing for cancellation.
+
+---
+
+# Phase 2 — deferred items
+
+Taken from the Out of scope list above, in the order asked for. **All four
+complete.** 199 tests, race clean, lint clean, plugin builds.
+
+## 10. Multi-shard datasets — DONE
+
+A HuggingFace split is a list of shard URLs, not one file. Open a list and
+treat it as one logical table.
+
+**Design.** `inst.Any` becomes a `*shards` holding `[]*pqarrow.FileReader`
+uniformly — a single file is simply one shard. That collapses the 21 places
+that currently type assert `inst.Any.(*pqarrow.FileReader)` into one accessor
+and is what makes every existing method work on a dataset without a parallel
+flavor. `parquet-open` and the `:file` init keyword accept a list as well as a
+string.
+
+Aggregation rules:
+
+| method | across shards |
+|---|---|
+| `:row-count`, `:row-group-count` | summed |
+| `:rows`, `:each-row`, `:column`, `:columns` | concatenated in order |
+| `:row-group-info`, `:statistics` | global row group index across shards |
+| `:schema`, `:column-count`, `:version`, `:created-by`, `:metadata` | first shard |
+| `:filepath` | a list when more than one |
+| `:close` | all shards |
+
+Shards must share a schema. A mismatch is an error at open rather than a
+confusing read later.
+
+*Verified:* 13 tests. New fixtures `shard-0/1/2.parquet` hold exactly the same
+15 rows as `multi-group.parquet`, so the two are compared directly:
+`TestShardsPagingMatchesSingleFile` checks all 289 offset/limit combinations
+from 0..16 against the single file and `TestShardsRowsMatchSingleFile` checks
+`:rows` in both formats, `:column`, and `:columns`. Schema mismatch, an empty
+list, a non-string entry, and a missing shard all raise. Live test opens the
+two shards of the wikitext-103 train split and confirms the dataset row count
+is the sum of the shards read alone, that the tail of shard 0 runs into shard
+1, and that row groups past the first report `shard` 1.
+
+The `*shards` refactor also finished the `readerArg` cleanup that was left over
+from phase 1 — all 21 `inst.Any.(*pqarrow.FileReader)` assertions are gone and
+the six function files that still unwrapped inline now use the helper.
+
+**API change:** `parquet-row-group-info` and `parquet-statistics` gained a
+`shard` key, and row group numbers now run across the dataset rather than
+within a file. Tests, doc strings, and the README were updated together.
+
+## 11. Dictionary column fast path — DONE
+
+Dictionary encoded columns fall through to `GetOneForMarshal` and are decoded
+via JSON. Correct but slow, and HuggingFace leans on dictionary encoding for
+categorical strings.
+
+*Verified:* an `*array.Dictionary` case follows the index into the dictionary
+and recurses on the typed path. `TestDictionaryMatchesJSONPath` cross-checks
+the result against what the old marshal path produced for all 8 index widths
+crossed with string, int64, and float64 value types, including nulls — 96
+comparisons. The octets option still applies to a dictionary of binary values.
+
+    BenchmarkDictionaryTyped      23423 ns/op   16000 B/op   1000 allocs/op
+    BenchmarkDictionaryMarshal    32695 ns/op   32000 B/op   2000 allocs/op
+
+1.4x faster and half the allocations — one per value instead of two, the
+saving being the interface boxing `GetOneForMarshal` does. Both benchmarks are
+kept so the comparison stays checkable.
+
+## 12. Context plumbing — DONE
+
+`context.Background()` is hardcoded at every `GetColumn` / `GetFieldReader`
+call. Now that reads are network bound a slow or hung server cannot be given
+up on.
+
+*Verified:* the three hard coded `context.Background()` calls are gone. A
+reader owns a cancellable context created at open, every arrow read is made
+under it, and remote requests are built with `http.NewRequestWithContext` so
+the cancellation reaches the network rather than stopping at the arrow layer.
+`:close` cancels it.
+
+A `:timeout` option was added since a context alone gives the caller nothing to
+control. It sets the dial and response header timeouts, defaulting to the 30
+seconds that used to be hard coded.
+
+`TestTimeoutStalledServer` points a reader at a server that accepts the
+connection and never answers; with `:timeout 0.25` it gives up in 0.25s instead
+of waiting out the default.
+
+**Scoped deliberately:** the timeout covers connecting and waiting for response
+headers, not the transfer of the body. A single column chunk over a slow link
+can legitimately take a long time and a deadline there would fail real reads.
+That was the tradeoff the hard coded `ResponseHeaderTimeout` already made; it
+is now configurable and documented rather than implicit.
+
+## 13. Decimal cases — DONE
+
+Decimal128/256, and now 32/64, have no explicit case so they take the JSON
+path. Precision matters for decimals so this should be deliberate.
+
+*Verified:* explicit cases for Decimal32/64/128/256 using each type's own
+`ToString(scale)` rather than the marshal path.
+
+**The premise turned out to be half wrong and half worse than expected.** There
+was no precision loss: the old path went through `big.Float` but round tripped
+all 38 digits of a decimal128 correctly, checked at the limit
+(`99999999999999999999999999999999999999`).
+
+What it did lose was the **scale**. `Text('g', precision)` drops trailing
+zeros, so a money column of scale 2 read back wrong:
+
+| stored | before | after |
+|---|---|---|
+| `10.50` | `10.5` | `10.50` |
+| `10.00` | `10` | `10.00` |
+| `0.1000` (scale 4) | `0.1` | `0.1000` |
+| `-42.10` | `-42.1` | `-42.10` |
+| `0.00` | `0` | `0.00` |
+
+Numerically equal but it discards what the file declares, in the same way the
+null bug was numerically fine and still wrong.
+
+**Visible change on a real fixture:** `byte-array-decimal.parquet` is scale 2,
+so its values went from `"1"`, `"2"` … to `"1.00"`, `"2.00"` …. That is the
+file's own scale, so the new reading is the faithful one, but it is a change
+any existing caller will see.
+
+Decimals stay strings. `slip.Ratio` was considered since it is exact and
+supports arithmetic, but it prints a scale 2 `10.50` as `21/2`, which is worse
+than useless for browsing a money column.
+
+
+## 14. Coverage cleanup — DONE
+
+Closing the gaps found in the coverage audit. 96.5% -> 97.0%, 199 -> 211 tests.
+
+**Dead code removed rather than tested.** The `:binary-as` and `:timeout` arms
+of the `:init` switch could never run: a flavor init keyword that matches an
+instance variable is assigned before `:init` and stripped from the arguments,
+so the instance variable read below was what actually ran. Only `:file` has no
+matching variable and still needs picking out. The `limit == 0` early return in
+`rowGroupsFor` was also unreachable since `rowPlan` returns before calling it.
+
+**Statistics gaps closed.** New fixture `stats-types.parquet` carries float32,
+fixed size binary, decimal, and boolean columns so those min/max branches are
+exercised from lisp. `findLeafColumn` is now 100%: all three lookup passes have
+tests, including the bare leaf name of a nested column (`a` for `st.a`), a
+symbol instead of a string, and the case insensitive fallback. `statNum` is
+100% via internal tests that build stat blocks directly, including the Int96
+encoded bytes fallback that no writer here produces.
+
+**Other gaps closed.** New fixture `big.parquet` holds 10000 rows in one row
+group so an offset past the 4096 batch size makes the skip loop run more than
+once. Shards differing in field count. An empty column list giving no rows. A
+`:timeout` given as a single float.
+
+**Left uncovered deliberately** — 32 statements, all defensive: `err != nil`
+on calls that cannot fail once a reader is open, nil guards that exist so the
+helpers are safe to call, `HasDistinctCount` which arrow documents as never
+populated by the writer, and files with zero row groups or zero columns which
+no writer produces.
+
+
+## 15. parquet-explore — DONE
+
+A table view for eyeballing a file, which is what browsing a dataset was
+missing. `(parquet-explore reader &optional column-ids &key :format :limit
+:offset :width :null :summary :stream)`.
+
+Follows `describe` in writing to `*standard-output*` and returning `Novalue`
+rather than returning a string, since a returned string prints with escaped
+newlines and is unreadable in a REPL. `:stream` keeps it capturable and
+`with-output-to-string` works. `column-ids` is optional and positional exactly
+as on `:rows` and `:each-row` so the package reads the same way throughout.
+
+Decisions taken with joe:
+
+- **Nulls are a blank cell by default** with a `:null` option, matching psql.
+  Worth knowing that this means a null and an empty string look the same in the
+  table even though `:rows` tells them apart. `:null "NULL"` when it matters.
+- **The summary line is opt in** via `:summary t` so the default output pastes
+  straight into markdown or a spreadsheet.
+- **Defaults are 10 rows and a width of 40**, the wider cell suiting the text
+  heavy columns a HuggingFace dataset tends to have.
+
+Details handled: newlines and tabs in a value are flattened since one review
+holding a newline would shred the table, `|` is escaped in markdown cells,
+truncation and padding are rune aware.
+
+*Verified:* 14 tests comparing whole tables rather than fragments, including
+that every rendered line is the same rune width. Live test explores imdb and
+checks the alignment holds with reviews thousands of characters long.

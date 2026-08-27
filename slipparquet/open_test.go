@@ -27,3 +27,18 @@ func TestOpenBadFile(t *testing.T) {
 		PanicType: slip.Symbol("type-error"),
 	}).Test(t)
 }
+
+// A keyword that is not a symbol is reported as the wrong type rather than as a
+// keyword with no value, which is what a bare check for a following value would
+// say when the bad argument is the last one.
+func TestOpenBadKeyword(t *testing.T) {
+	for _, src := range []string{
+		`(parquet-open "testdata/primitive.parquet" 7)`,
+		`(parquet-open "testdata/primitive.parquet" 7 :string)`,
+	} {
+		(&sliptest.Function{
+			Source:    src,
+			PanicType: slip.Symbol("type-error"),
+		}).Test(t)
+	}
+}

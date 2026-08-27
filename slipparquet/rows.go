@@ -3,9 +3,7 @@
 package slipparquet
 
 import (
-	"github.com/apache/arrow/go/v15/parquet/pqarrow"
 	"github.com/ohler55/slip"
-	"github.com/ohler55/slip/pkg/flavors"
 )
 
 func init() {
@@ -37,6 +35,20 @@ of each element in an assoc list for each key value pair.`,
 					Text: `A list of the column indexes or names for the columns to get values
 from. The default is all columns`,
 				},
+				{Name: "&key"},
+				{
+					Name: ":offset",
+					Type: "fixnum",
+					Text: "The number of rows to skip. The default is 0.",
+				},
+				{
+					Name: ":limit",
+					Type: "fixnum",
+					Text: `The maximum number of rows. The default is all of them.
+
+Only the row groups holding the requested rows are read so paging through a large
+or remote file does not read the whole file.`,
+				},
 			},
 			Return: "list",
 			Text: `__parquet-rows__ returns the rows of a parquet reader in the _format_
@@ -47,6 +59,8 @@ that none of the _:rows_ daemons are called.`,
 			Examples: []string{
 				`(setq reader (parquet-open "sample.parquet"))`,
 				`(parquet-rows reader :assoc '(0 2)) => ((("a" . 1)("c" . t)) (("a" . 2) ("c" . nil)))`,
+				`(parquet-rows reader :list nil :offset 100 :limit 10) ;; rows 100 through 109`,
+				`(parquet-rows reader :list :limit 10) ;; the first 10 rows of all columns`,
 			},
 		}, &Pkg)
 }
@@ -58,22 +72,11 @@ type Rows struct {
 
 // Call the function with the arguments provided.
 func (f *Rows) Call(s *slip.Scope, args slip.List, depth int) slip.Object {
-	slip.CheckArgCount(s, depth, f, args, 2, 3)
-	inst, ok := args[0].(*flavors.Instance)
-	if !ok {
-		slip.TypePanic(s, depth, "reader", args[0], "parquet-reader-flavor instance")
-	}
-	var fr *pqarrow.FileReader
-	if fr, ok = inst.Any.(*pqarrow.FileReader); !ok {
-		slip.TypePanic(s, depth, "reader", args[0], "parquet-reader-flavor instance")
-	}
-	rowCnt := fr.ParquetReader().NumRows()
-	rows := make(slip.List, 0, rowCnt)
-	var ids slip.Object
-	if 2 < len(args) {
-		ids = args[2]
-	}
-	rr := newRowReader(s, fr, ids, args[1], depth)
+	slip.CheckArgCount(s, depth, f, args, 2, 7)
+	fr, octets := readerOctets(s, args, depth)
+	ids, offset, limit := parseRowOpts(s, args[2:], depth)
+	rows := make(slip.List, 0, rowCap(fr, limit))
+	rr := newRowReader(s, fr, ids, args[1], offset, limit, octets, depth)
 	for {
 		row := rr.next()
 		if row == nil {
