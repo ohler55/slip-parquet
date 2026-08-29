@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.5.1] 2026-08-29
 ### Added
 - `parquet-open` and the `:file` init keyword now accept an HTTP or HTTPS URL. Remote files are
   read with range requests so only the parts used are fetched. The `HF_TOKEN` environment
@@ -56,6 +56,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Dictionary encoded columns are read by following the index into the dictionary rather than by
   encoding each value and parsing it back. 1.4 times faster with half the allocations. Values
   are unchanged.
+- Updated to v1.5.1 of slip.
 
 ### Removed
 - Dead `:binary-as` and `:timeout` handling in the reader `:init` method. A flavor init keyword
