@@ -5,7 +5,7 @@ go 1.27
 require (
 	github.com/apache/arrow-go/v18 v18.8.0
 	github.com/ohler55/ojg v1.28.8
-	github.com/ohler55/slip v1.6.0
+	github.com/ohler55/slip v1.6.1
 	golang.org/x/text v0.43.0
 )
 
@@ -29,5 +29,3 @@ require (
 	google.golang.org/grpc v1.83.2 // indirect
 	google.golang.org/protobuf v1.36.12 // indirect
 )
-
-replace github.com/ohler55/slip => ../slip

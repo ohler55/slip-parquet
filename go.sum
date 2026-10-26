@@ -26,6 +26,8 @@ github.com/klauspost/cpuid/v2 v2.4.0 h1:S6Hrbc7+ywsr0r+RLapfGBHfyefhCTwEh3A0tV91
 github.com/klauspost/cpuid/v2 v2.4.0/go.mod h1:19jmZ9mjzoF//ddRSUsv0zfBTJWh3QJh9FNxZTMrGxU=
 github.com/ohler55/ojg v1.28.8 h1:yQc4wohgHzCCi/22uJuYzFKAYjktbTpOHMghZxatq7A=
 github.com/ohler55/ojg v1.28.8/go.mod h1:/Y5dGWkekv9ocnUixuETqiL58f+5pAsUfg5P8e7Pa2o=
+github.com/ohler55/slip v1.6.1 h1:d5RGKCGqctBIzG1Fzqx1UGBMRk6VSYmtVE2RKYhnfRA=
+github.com/ohler55/slip v1.6.1/go.mod h1:DqVU/s34ocIv/JLXqr+B4s67jT4wCHLERNtXeMQZ3XY=
 github.com/pierrec/lz4/v4 v4.1.29 h1:CDQY6qZOLI4DW0Nx6R1vRrifrCeQHnNXkMb0hZWXFjg=
 github.com/pierrec/lz4/v4 v4.1.29/go.mod h1:EoQMVJgeeEOMsCqCzqFm2O0cJvljX2nGZjcRIPL34O4=
 github.com/stretchr/objx v0.5.3 h1:jmXUvGomnU1o3W/V5h2VEradbpJDwGrzugQQvL0POH4=
